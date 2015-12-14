@@ -1,0 +1,196 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+	    <groupId>org.onebusaway</groupId>
+	    <artifactId>onebusaway-gtfs-realtime-feed</artifactId>
+	    <version>0.0.1</version>
+	</parent>
+	<artifactId>onebusaway-gtfs-rt-feed-builder</artifactId>
+	<name>onebusaway-gtfs-rt-feed-builder</name>
+	<packaging>war</packaging>
+
+	<dependencies>
+		<dependency>
+		  <groupId>javax.servlet</groupId>
+		  <artifactId>servlet-api</artifactId>
+		  <version>2.4</version>
+		  <scope>provided</scope>
+		</dependency>
+
+		<!-- <dependency> <groupId>net.sf.opencsv</groupId> <artifactId>opencsv</artifactId> 
+			<version>2.0</version> </dependency> -->
+<!-- 		<dependency> -->
+<!-- 			<groupId>org.onebusaway</groupId> -->
+<!-- 			<artifactId>onebusaway-gtfs-realtime-exporter</artifactId> -->
+<!-- 			<version>1.1.1-SNAPSHOT</version> -->
+<!-- 		</dependency> -->
+<!-- 		<dependency> -->
+<!-- 			<groupId>org.onebusaway</groupId> -->
+<!-- 			<artifactId>onebusaway-guice-jsr250</artifactId> -->
+<!-- 			<version>1.0.2-SNAPSHOT</version> -->
+<!-- 		</dependency> -->
+
+		<!-- OneBusAway Dependencies -->
+		<dependency>
+			<groupId>org.onebusaway</groupId>
+			<artifactId>onebusaway-transit-data-federation</artifactId>
+			<version>1.1.15.1-cs-SNAPSHOT</version>
+		</dependency>
+	    <dependency>
+	      <groupId>org.onebusaway</groupId>
+	      <artifactId>onebusaway-container</artifactId>
+	      <version>1.1.14-SNAPSHOT</version>
+	    </dependency>
+		<dependency>
+			<groupId>org.onebusaway</groupId>
+			<artifactId>onebusaway-util</artifactId>
+			<version>1.1.15-cs-SNAPSHOT</version>
+			<exclusions>
+				<exclusion>
+					<artifactId>slf4j-api</artifactId>
+					<groupId>org.slf4j</groupId>
+				</exclusion>
+				<exclusion>
+					<artifactId>slf4j-log4j12</artifactId>
+					<groupId>org.slf4j</groupId>
+				</exclusion>
+				<exclusion>
+					<artifactId>jcl-over-slf4j</artifactId>
+					<groupId>org.slf4j</groupId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.onebusaway</groupId>
+			<artifactId>onebusaway-cli</artifactId>
+			<version>1.0.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-log4j12</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.onebusaway</groupId>
+			<artifactId>onebusaway-geospatial</artifactId>
+			<version>1.1.14-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+			<groupId>org.onebusaway</groupId>
+			<artifactId>onebusaway-api-core</artifactId>
+			<version>1.1.14-SNAPSHOT</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-math</artifactId>
+			<version>2.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.tuckey</groupId>
+			<artifactId>urlrewritefilter</artifactId>
+			<version>3.2.0</version>
+			<type>jar</type>
+			<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>mysql</groupId>
+			<artifactId>mysql-connector-java</artifactId>
+			<version>5.1.17</version>
+		</dependency>
+	     <dependency>
+	        <groupId>org.codehaus.jackson</groupId>
+	        <artifactId>jackson-mapper-asl</artifactId>
+	        <version>1.9.2</version>
+	    </dependency>
+    
+	    <!-- Struts 2 -->
+	    <dependency>
+	      <groupId>org.apache.struts</groupId>
+	      <artifactId>struts2-core</artifactId>
+	    </dependency>
+	    <dependency>
+	      <groupId>org.apache.struts</groupId>
+	      <artifactId>struts2-spring-plugin</artifactId>
+	    </dependency>
+	    <dependency>
+	      <groupId>org.apache.struts</groupId>
+	      <artifactId>struts2-convention-plugin</artifactId>
+	    </dependency>
+	    <dependency>
+	      <groupId>org.apache.struts</groupId>
+	      <artifactId>struts2-rest-plugin</artifactId>
+	    </dependency>
+
+		<!--  For Jersey REST support -->
+		<dependency>
+			<groupId>com.sun.jersey</groupId>
+			<artifactId>jersey-server</artifactId>
+			<version>1.9.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.sun.jersey.contribs</groupId>
+			<artifactId>jersey-spring</artifactId>
+			<version>1.9.1</version>
+		</dependency>
+		<dependency>
+			<groupId>com.sun.jersey</groupId>
+			<artifactId>jersey-bundle</artifactId>
+			<version>1.10</version>
+		</dependency>
+    
+	</dependencies>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>2.3.2</version>
+				<configuration>
+					<source>1.7</source>
+					<target>1.7</target>
+				</configuration>
+			</plugin>
+			<!--
+			<plugin>
+				<artifactId>maven-shade-plugin</artifactId>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+						<configuration>
+							<filters>
+								<filter>
+									<artifact>*:*</artifact>
+									<excludes>
+										<exclude>META-INF/*.SF</exclude>
+										<exclude>META-INF/*.DSA</exclude>
+										<exclude>META-INF/*.RSA</exclude>
+									</excludes>
+								</filter>
+							</filters>
+							<shadedClassifierName>withAllDependencies</shadedClassifierName>
+							<transformers>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+									<mainClass>org.onebusaway.realtime.hamilton.HamiltonToGtfsRealtimeMain</mainClass>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+									<resource>META-INF/spring.handlers</resource>
+								</transformer>
+								<transformer
+									implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+									<resource>META-INF/spring.schemas</resource>
+								</transformer>
+							</transformers>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			-->
+		</plugins>
+	</build>
+</project>
