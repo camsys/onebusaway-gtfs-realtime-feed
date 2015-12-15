@@ -547,7 +547,9 @@ public class FeedServiceImpl implements FeedService {
 
     //String direction = getTripDirection(trip);
     String direction = "0"; 		// Default to south, outbound
-    if (trip.getDirection().equals("N")) {
+    if (trip.getDirection() == null) {
+      _log.info("No trip direction provided for trip " + trip.getTripId() + ". Defaulting to outbound.");
+    } else if (trip.getDirection().equals("N")) {
     	direction = "1";
     }
     String tripId = getTripForStop(stopId, direction, scheduledTime);
