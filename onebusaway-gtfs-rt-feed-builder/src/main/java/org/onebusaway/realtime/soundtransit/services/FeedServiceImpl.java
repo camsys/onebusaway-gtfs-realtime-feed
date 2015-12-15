@@ -185,23 +185,6 @@ public class FeedServiceImpl implements FeedService {
     this.tripMapping = tripMapping;
   }
 
-  //public String getLinkRouteId() {
-    //if (linkRouteId == null) {
-    //  linkRouteId = configService.getConfigurationValueAsString(
-    //      "linkRouteId", DEFAULT_LINK_ROUTE_ID);
-    //}
-    //return _linkRouteId;
-  //}
-
-  //public void setLinkRouteId(String linkRouteId) {
-  //  this._linkRouteId = linkRouteId;
-  //}
-
- // @Autowired
- // public void setConfigurationService(ConfigurationService configService) {
- //   this.configService = configService;
- // }
-
   public void init() {
 	  _log.info("Starting _feedService.init()");
 	  List<AgencyEntry> agencies = _transitGraphDao.getAllAgencies();
@@ -531,7 +514,21 @@ public class FeedServiceImpl implements FeedService {
       for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
         if (!stopTimeUpdate.getStopId().isEmpty()) {
           stopId = stopTimeUpdate.getStopId();
+          if (stopTimeUpdate.getArrivalTime() == null) {
+            _log.info("No arrival time info for trip " + trip.getTripId());
+            continue;
+          }
           String formattedTime = stopTimeUpdate.getArrivalTime().getScheduled();
+          if (formattedTime ==  null) {
+            formattedTime = stopTimeUpdate.getArrivalTime().getEstimated();
+          }
+          if (formattedTime ==  null) {
+            formattedTime = stopTimeUpdate.getArrivalTime().getActual();
+          }
+          if (formattedTime ==  null) {
+            _log.info("No arrival time info for trip " + trip.getTripId());
+            continue;
+          }
           formattedTime = formattedTime.substring(formattedTime.indexOf('T')+1, formattedTime.indexOf('T') + 9);
           String[] timeArray = formattedTime.split(":");
           int hours = Integer.parseInt(timeArray[0]);
@@ -672,25 +669,6 @@ public class FeedServiceImpl implements FeedService {
     
     return tripId;
   }
-  /*
-  private String getTripDirection(TripInfo trip) {
-    String tripDirection = "0";
-    StopUpdatesList stopTimeUpdateData = trip.getStopUpdates();
-    List<StopUpdate> stopTimeUpdates = stopTimeUpdateData.getUpdates();
-    if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
-      for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
-        if (stopTimeUpdate.getStopId().startsWith("NB")) {
-          tripDirection = "1";
-          break;
-        } else if (stopTimeUpdate.getStopId().startsWith("SB")) {
-          tripDirection = "0";
-          break;
-        }
-      }
-    }
-    return tripDirection;
-  }
-  */
   
   // Returns the start time in seconds of the trip
   private int getTripStartTimeInSecs(TripEntry trip) {
@@ -705,7 +683,6 @@ public class FeedServiceImpl implements FeedService {
   	return startTime;
   }
 
-  
   private class TripComparator implements Comparator<TripEntry> {
 
     @Override
@@ -762,5 +739,4 @@ public class FeedServiceImpl implements FeedService {
       this.offset = offset;
     }
   }
-
 }

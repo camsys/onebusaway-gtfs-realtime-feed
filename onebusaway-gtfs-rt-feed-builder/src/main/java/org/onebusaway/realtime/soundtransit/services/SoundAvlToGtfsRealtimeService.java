@@ -99,20 +99,13 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   public void start() throws Exception {
     _log.info("starting GTFS-realtime service");
     _feedService.init();
-    //if (_gtfsRealtimeProvider != null) {
-      _refreshExecutor = Executors.newSingleThreadScheduledExecutor();
-      _refreshExecutor.scheduleAtFixedRate(new RefreshTransitData(), 0,
-          _refreshInterval, TimeUnit.SECONDS);
+    _refreshExecutor = Executors.newSingleThreadScheduledExecutor();
+    _refreshExecutor.scheduleAtFixedRate(new RefreshTransitData(), 0,
+        _refreshInterval, TimeUnit.SECONDS);
 
-      _delayExecutor = Executors.newSingleThreadScheduledExecutor();
-      _delayExecutor.scheduleAtFixedRate(new DelayThread(), _refreshInterval,
-          _refreshInterval / 4, TimeUnit.SECONDS);
-    //} else {
-    //  _log.error("Testing mode.  RefreshInterval ignored!");
-
-    //  new Thread(new RefreshTransitData()).run();
-
-    //}
+    _delayExecutor = Executors.newSingleThreadScheduledExecutor();
+    _delayExecutor.scheduleAtFixedRate(new DelayThread(), _refreshInterval,
+        _refreshInterval / 4, TimeUnit.SECONDS);
   }
 
   @PreDestroy
@@ -142,12 +135,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   }
 
   public void writeGtfsRealtimeOutput() throws Exception {
-    //TODO: move url to config file
-    //URL avlUpdatesUrl = new URL(
-    //    "http://localhost:9764/services/tss_lab/GetOnScheduleTrains?TimeInterval=5");
     _log.info("About to call readAvlUpdatesFromUrl");
-    
-    //_linkAvlFeedUrl = new URL("http://localhost:9764/services/tss_lab/GetOnScheduleTrains?TimeInterval=5");
     String dataFromAvl = readAvlUpdatesFromUrl(_linkAvlFeedUrl);
     _log.info("AVL: " + dataFromAvl);
     writeGtfsRealtimeOutput(dataFromAvl);
@@ -173,15 +161,13 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
         _lastUpdateTime = System.currentTimeMillis();
       } catch (Exception ex) {
         _log.error("Failed to refresh TransitData: " + ex.getMessage());
-        //_log.error(ex.toString(), ex);
+        _log.error(ex.toString(), ex);
         _log.error("Continuing processing.");
       }
     }
   }
   private class DelayThread implements Runnable {
     public void run() {
-    	/* ToDo - get hang time */
-      //long hangTime = 0;  // For now, just set to 0;
       long updateTime = (System.currentTimeMillis() - _lastUpdateTime) / 1000;
       //if (hangTime > (_refreshInterval * 6)) {
         // if we've reached here, the connection to the database has hung
@@ -209,10 +195,10 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     for (String propertyKey : properties.keySet()) {
       _log.info("property key: " + propertyKey);
     }
-    _log.info("Accept header: " + avlConnection.getHeaderField("Accept"));
-    _log.info("Accept property: " + avlConnection.getRequestProperty("Accept"));
-    _log.info("content type: " + avlConnection.getContentType());
-    _log.info("accept header: " + avlConnection.getHeaderField("Accept"));
+    //_log.info("Accept header: " + avlConnection.getHeaderField("Accept"));
+    //_log.info("Accept property: " + avlConnection.getRequestProperty("Accept"));
+    //_log.info("content type: " + avlConnection.getContentType());
+    //_log.info("accept header: " + avlConnection.getHeaderField("Accept"));
     InputStream in = avlConnection.getInputStream();
     try {
       BufferedReader br = new BufferedReader(new InputStreamReader(in));

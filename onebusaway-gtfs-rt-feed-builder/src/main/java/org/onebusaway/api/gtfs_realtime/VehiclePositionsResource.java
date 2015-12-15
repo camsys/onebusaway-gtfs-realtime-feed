@@ -66,7 +66,12 @@ public class VehiclePositionsResource extends GtfsRealtimeResource {
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   public byte[] getRealtimeVehiclePositionsPB() {
 	  FeedMessage currentVehiclePositions = _feedService.getCurrentVehiclePositions();
-	  return currentVehiclePositions.toByteArray();
+	  if (currentVehiclePositions != null) {
+	    return currentVehiclePositions.toByteArray();
+	  } else {
+      return new byte[0];
+    }
+
   }
   
   //@Override

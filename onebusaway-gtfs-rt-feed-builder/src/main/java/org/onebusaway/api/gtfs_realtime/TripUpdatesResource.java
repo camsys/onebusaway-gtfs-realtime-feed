@@ -71,7 +71,11 @@ public class TripUpdatesResource extends GtfsRealtimeResource {
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   public byte[] getRealtimeTripUpdatesPB() {
 	  FeedMessage currentTripUpdates = _feedService.getCurrentTripUpdates();
-	  return currentTripUpdates.toByteArray();
+	  if (currentTripUpdates != null) {
+	    return currentTripUpdates.toByteArray();
+	  } else {
+	    return new byte[0];
+	  }
   }
   
   //@Override

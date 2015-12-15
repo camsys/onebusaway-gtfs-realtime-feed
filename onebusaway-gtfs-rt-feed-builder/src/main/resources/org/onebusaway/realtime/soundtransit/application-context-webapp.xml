@@ -38,11 +38,6 @@
 		/> <property name="tripStopTimesBeanService" ref="tripStopTimesBeanServiceImpl" 
 		/> </bean> -->
 	
-	<bean id="gtfsService"
-		class="org.onebusaway.realtime.soundtransit.services.SoundAvlToGtfsRealtimeService">
-	</bean>
-	
-		<!-- <property name="AVLTranslator" ref="avlTranslator" /> -->
 	<!--
 		<property name="gtfsRealtimeProvider" ref="gtfsProvider" />
 	</bean>
