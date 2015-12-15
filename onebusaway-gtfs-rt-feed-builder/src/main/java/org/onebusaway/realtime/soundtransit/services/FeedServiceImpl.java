@@ -140,7 +140,9 @@ public class FeedServiceImpl implements FeedService {
         _log.error("Error reading StopMapping file " + e.getMessage());
       } finally {
         try {
-          br.close();
+          if (br != null) {
+            br.close();
+          }
         } catch (IOException e) {
           _log.error("Exception closing file reader: " + e.getMessage());
         }
