@@ -127,7 +127,7 @@ public class FeedServiceImpl implements FeedService {
       try {
         stopMapping = new HashMap<String, String>();
         String ln = "";
-        if (_linkStopMappingFile.isEmpty()) {
+        if (_linkStopMappingFile == null || _linkStopMappingFile.isEmpty()) {
           _linkStopMappingFile = "/var/lib/oba/LinkStopMapping.txt";  // Default
         }
         br = new BufferedReader(new FileReader(_linkStopMappingFile));
