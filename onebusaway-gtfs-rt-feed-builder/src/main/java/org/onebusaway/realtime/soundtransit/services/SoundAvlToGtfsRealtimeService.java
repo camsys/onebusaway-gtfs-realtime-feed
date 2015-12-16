@@ -135,9 +135,9 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   }
 
   public void writeGtfsRealtimeOutput() throws Exception {
-    _log.info("About to call readAvlUpdatesFromUrl");
+    _log.debug("About to call readAvlUpdatesFromUrl");
     String dataFromAvl = readAvlUpdatesFromUrl(_linkAvlFeedUrl);
-    _log.info("AVL: " + dataFromAvl);
+    _log.debug("AVL: " + dataFromAvl);
     writeGtfsRealtimeOutput(dataFromAvl);
   }
 
@@ -213,7 +213,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
         _log.error("error closing url stream " + url);
       }
     }
-    _log.info("result: " + result);
+    _log.debug("result: " + result);
     return result;
   }
 }

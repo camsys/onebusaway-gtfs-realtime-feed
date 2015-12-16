@@ -127,8 +127,6 @@ public class FeedServiceImpl implements FeedService {
       try {
         stopMapping = new HashMap<String, String>();
         String ln = "";
-        //br = new BufferedReader(new FileReader(
-        //    "/var/lib/oba/AvlStopMapping.txt"));
         br = new BufferedReader(new FileReader(_linkStopMappingFile));
         while ((ln = br.readLine()) != null) {
           int idx = ln.indexOf(',');
@@ -235,7 +233,7 @@ public class FeedServiceImpl implements FeedService {
     try {
       linkAVLData = mapper.readValue(feedData, LinkAVLData.class);
       if (linkAVLData != null) {
-        _log.info("Parsed AVL data: " + mapper.writeValueAsString(linkAVLData));
+        _log.debug("Parsed AVL data: " + mapper.writeValueAsString(linkAVLData));
       }
     } catch (JsonParseException e) {
       _log.error("JsonParseException trying to parse feed data.");
@@ -378,7 +376,7 @@ public class FeedServiceImpl implements FeedService {
     header.setIncrementality(Incrementality.FULL_DATASET);
     header.setGtfsRealtimeVersion(GtfsRealtimeConstants.VERSION);
     feedMessageBuilder.setHeader(header);
-    _log.info("Process trips");
+    _log.info("Processing " + trips.size() + " trips");
     if (trips != null) {
       for (TripInfo trip : trips) {
         TripUpdate.Builder tu = TripUpdate.newBuilder();
