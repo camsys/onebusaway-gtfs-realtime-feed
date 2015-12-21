@@ -83,10 +83,8 @@ public class FeedServiceImpl implements FeedService {
   private static String _linkStopMappingFile;
   private FeedMessage _currentVehiclePositions;
   private FeedMessage _currentTripUpdates;
-  //private String _linkRouteId;
-  private List<TripEntry> tripEntries;
+  private List<TripEntry> _tripEntries;
   private List<StopOffset> stopOffsets;
-  //private ConfigurationService configService;
 
   public void setLinkAgencyId(String linkAgencyId) {
     _linkAgencyId = linkAgencyId;
@@ -119,6 +117,10 @@ public class FeedServiceImpl implements FeedService {
 
   public void setCurrentTripUpdates(FeedMessage currentTripUpdates) {
     this._currentTripUpdates = currentTripUpdates;
+  }
+
+  public void set_tripEntries(List<TripEntry> _tripEntries) {
+    this._tripEntries = _tripEntries;
   }
 
   public Map<String, String> getStopMapping() {
@@ -190,8 +192,10 @@ public class FeedServiceImpl implements FeedService {
 
   public void init() {
 	  _log.info("Starting _feedService.init()");
-	  List<AgencyEntry> agencies = _transitGraphDao.getAllAgencies();
-	  tripEntries = getLinkTrips();
+	  //List<AgencyEntry> agencies = _transitGraphDao.getAllAgencies();
+	  if (_tripEntries == null) {  // Should be null unless unit test injects a value.
+	    _tripEntries = getLinkTrips();
+	  }
 	  // Set up list of offset for stops.  This is the time in minutes from the beginning of the trip
 	  // For now hardcode the tables to help localize debugging.
 	  // TBD: construct the tables dynamically
@@ -270,9 +274,11 @@ public class FeedServiceImpl implements FeedService {
         VehiclePosition.Builder vp = VehiclePosition.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
-        String vehicleId = (String) trip.getVehicleId();
-        if (vehicleId == null) {
-          vehicleId = "";
+        String vehicleId = "";
+        // Use trip id as vehicle id to avoid issues with vehicle id
+        // changing if train backs up.
+        if (trip.getTripId() != null) {
+          vehicleId = trip.getTripId();
         }
         vd.setId(vehicleId);
         vp.setVehicle(vd);
@@ -389,9 +395,11 @@ public class FeedServiceImpl implements FeedService {
 
         // Build the VehicleDescriptor
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
-        String vehicleId = trip.getVehicleId();
-        if (vehicleId == null) {
-          vehicleId = "";
+        String vehicleId = "";
+        // Use trip id as vehicle id to avoid issues with vehicle id
+        // changing if train backs up.
+        if (trip.getTripId() != null) {
+          vehicleId = trip.getTripId();
         }
         vd.setId(vehicleId);
         tu.setVehicle(vd);
@@ -402,7 +410,7 @@ public class FeedServiceImpl implements FeedService {
         tu.setTimestamp(System.currentTimeMillis()/1000);
         FeedEntity.Builder entity = FeedEntity.newBuilder();
         // Use VehicleId for entity Id since that is unique per trip
-        entity.setId(trip.getVehicleId());
+        entity.setId(vehicleId);
         entity.setTripUpdate(tu);
         feedMessageBuilder.addEntity(entity);
       }
@@ -541,11 +549,14 @@ public class FeedServiceImpl implements FeedService {
         }
       }
     }
-    
+    _log.info("Stop id before mapping: " + stopId);
     if (stopId != null) {
       stopId = getStopMapping().get(stopId);
     }
 
+    if (stopId == null || stopId.isEmpty()) {
+      _log.info("stopid is null for trip " + trip.getTripId() + " and stop " + trip.getLastStopName());
+    }
     //String direction = getTripDirection(trip);
     String direction = "0"; 		// Default to south, outbound
     if (trip.getDirection() == null) {
@@ -650,7 +661,7 @@ public class FeedServiceImpl implements FeedService {
     int tripStartTime = scheduledTime - (offset * 60);
     String tripId = "";
     TripEntry lastTrip = null;
-    for (TripEntry tripEntry : tripEntries) {
+    for (TripEntry tripEntry : _tripEntries) {
       if (!direction.equals(tripEntry.getDirectionId())) {
         if (lastTrip != null) {
           tripId = lastTrip.getId().getId();
@@ -669,7 +680,7 @@ public class FeedServiceImpl implements FeedService {
       lastTrip = tripEntry;
     }
     if (tripId == null) {  // Assign it to the last stop
-      tripId = tripEntries.get(tripEntries.size()-1).getId().getId();
+      tripId = _tripEntries.get(_tripEntries.size()-1).getId().getId();
     }
     
     return tripId;
