@@ -30,20 +30,15 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
-import org.onebusaway.realtime.soundtransit.model.StopUpdate;
-import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.realtime.soundtransit.model.TripInfoList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
 public class FeedServiceParseAvlTest {
   
   private static final Logger _log = LoggerFactory.getLogger(FeedServiceParseAvlTest.class);
-  //private static final String LINK_AVL_DATA_1 = "../test/resources/LinkAvlData.txt";
 
-  //private static final String LINK_AVL_DATA_1 = "/home/jpearson/src/onebusaway-gtfs-realtime-feed/onebusaway-gtfs-rt-feed-builder/src/test/resources/LinkAvlData.txt";
   private static final String LINK_AVL_DATA_1 = "src/test/resources/LinkAvlData.txt";
   private static final String LINK_AVL_DATA_2 = "src/test/resources/LinkAvlData_2.txt";
   
@@ -73,32 +68,9 @@ public class FeedServiceParseAvlTest {
 
   @Test
   public void testParseAVLFeed() {
-    /*
-    boolean fileExists = new File(LINK_AVL_DATA_1).exists();
-    assertTrue(fileExists);
-    String linkAvlFeed = "";
-    try {
-      BufferedReader br = new BufferedReader(new FileReader(LINK_AVL_DATA_1));
-      String nextLine = "";
-      while ((nextLine = br.readLine()) != null) {
-        linkAvlFeed = nextLine;
-      }
-    } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
-    _log.info("AVL data: " + linkAvlFeed);
-    
-    LinkAVLData parsedLinkAVLData =  _feedService.parseAVLFeed(linkAvlFeed);
-    */
-    
     // Verify number of trips in test data, should be three
     TripInfoList tripInfoList = parsedLinkAVLData_1.getTrips();
     List<TripInfo> trips = tripInfoList.getTrips();
-    _log.info("Number of trips: " + trips.size());
     assertEquals(3, trips.size());
     
     // Verify number of stop updates for each trip
@@ -114,32 +86,9 @@ public class FeedServiceParseAvlTest {
 
   @Test
   public void testParseAVLFeedMissingStopUpdates() {
-    /*
-    boolean fileExists = new File(LINK_AVL_DATA_2).exists();
-    assertTrue(fileExists);
-    String linkAvlFeed = "";
-    try {
-      BufferedReader br = new BufferedReader(new FileReader(LINK_AVL_DATA_2));
-      String nextLine = "";
-      while ((nextLine = br.readLine()) != null) {
-        linkAvlFeed = nextLine;
-      }
-    } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    } catch (IOException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-    }
-    _log.info("AVL data: " + linkAvlFeed);
-    
-    LinkAVLData parsedLinkAVLData =  _feedService.parseAVLFeed(linkAvlFeed);
-    */
-    
     // Verify number of trips in test data, should be three
     TripInfoList tripInfoList = parsedLinkAVLData_2.getTrips();
     List<TripInfo> trips = tripInfoList.getTrips();
-    _log.info("Number of trips: " + trips.size());
     assertEquals(3, trips.size());
     
     // Verify number of stop updates for each trip
@@ -158,21 +107,16 @@ public class FeedServiceParseAvlTest {
     boolean fileExists = new File(filename).exists();
     assertTrue(fileExists);
     String linkAvlFeed = "";
-    try {
-      BufferedReader br = new BufferedReader(new FileReader(filename));
+    try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
       String nextLine = "";
       while ((nextLine = br.readLine()) != null) {
         linkAvlFeed = nextLine;
       }
     } catch (FileNotFoundException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (IOException e) {
-      // TODO Auto-generated catch block
       e.printStackTrace();
     }
-    _log.info("AVL data: " + linkAvlFeed);
-    
     LinkAVLData parsedLinkAVLData =  _feedService.parseAVLFeed(linkAvlFeed);
     return parsedLinkAVLData;
   }
