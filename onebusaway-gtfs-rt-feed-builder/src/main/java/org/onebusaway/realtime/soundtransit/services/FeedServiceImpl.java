@@ -76,8 +76,6 @@ public class FeedServiceImpl implements FeedService {
   private TransitGraphDao _transitGraphDao;
   private Map<String, String> stopMapping = null;
   private Map<String, String> tripMapping = null;
-
-  //private static final String DEFAULT_LINK_ROUTE_ID = "100479";
   private String _linkAgencyId;
   private static String _linkRouteId;
   private static String _linkStopMappingFile;
@@ -160,7 +158,6 @@ public class FeedServiceImpl implements FeedService {
 
   public Map<String, String> getTripMapping() {
     if (tripMapping == null) {
-      _log.info("Reading from AvlTripMappingFile");
       BufferedReader br = null;
       try {
         tripMapping = new HashMap<String, String>();
@@ -191,8 +188,6 @@ public class FeedServiceImpl implements FeedService {
   }
 
   public void init() {
-	  _log.info("Starting _feedService.init()");
-	  //List<AgencyEntry> agencies = _transitGraphDao.getAllAgencies();
 	  if (_tripEntries == null) {  // Should be null unless unit test injects a value.
 	    _tripEntries = getLinkTrips();
 	  }
@@ -299,7 +294,8 @@ public class FeedServiceImpl implements FeedService {
         if (stopId == null) {
           stopId = "";
         } else {
-          stopId = getStopMapping().get(stopId);
+          String direction = getTripDirection(trip);
+          stopId = getGTFSStop(stopId, direction);
           if (stopId == null) {
             _log.info("Could not map stop: " + (String) trip.getLastStopId());
             stopId = "";
@@ -346,8 +342,9 @@ public class FeedServiceImpl implements FeedService {
         }
         // Reset stop id to next stop if it was unmapped
         if (stopId == "") {
-          if (getStopMapping().get(nextStop) != null) {
-            vp.setStopId(getStopMapping().get(nextStop));
+          String direction = getTripDirection(trip);
+          if (getGTFSStop(nextStop, direction) != null) {
+            vp.setStopId(getGTFSStop(nextStop, direction));
           }
         }
         TripDescriptor td = buildTripDescriptor(trip);
@@ -385,7 +382,7 @@ public class FeedServiceImpl implements FeedService {
     header.setIncrementality(Incrementality.FULL_DATASET);
     header.setGtfsRealtimeVersion(GtfsRealtimeConstants.VERSION);
     feedMessageBuilder.setHeader(header);
-    _log.info("Processing " + trips.size() + " trips");
+    _log.debug("Processing " + trips.size() + " trips");
     if (trips != null) {
       for (TripInfo trip : trips) {
         TripUpdate.Builder tu = TripUpdate.newBuilder();
@@ -466,8 +463,6 @@ public class FeedServiceImpl implements FeedService {
         }
       }
     }
-    // _log.info("Finished findNextStopOnTrip");
-
     return nextStop;
   }
 
@@ -497,7 +492,8 @@ public class FeedServiceImpl implements FeedService {
 
             String stopId = stopTimeUpdate.getStopId();
             if (stopId != null) {
-              stopId = getStopMapping().get(stopId);
+              String direction = getTripDirection(trip);
+              stopId = getGTFSStop(stopId, direction);
               if (stopId == null) {
                 continue; // No mapping for this stop, so don't add it.
               }
@@ -526,7 +522,7 @@ public class FeedServiceImpl implements FeedService {
         if (!stopTimeUpdate.getStopId().isEmpty()) {
           stopId = stopTimeUpdate.getStopId();
           if (stopTimeUpdate.getArrivalTime() == null) {
-            _log.info("No arrival time info for trip " + trip.getTripId());
+            _log.debug("No arrival time info for trip " + trip.getTripId());
             continue;
           }
           String formattedTime = stopTimeUpdate.getArrivalTime().getScheduled();
@@ -537,7 +533,7 @@ public class FeedServiceImpl implements FeedService {
             formattedTime = stopTimeUpdate.getArrivalTime().getActual();
           }
           if (formattedTime ==  null) {
-            _log.info("No arrival time info for trip " + trip.getTripId());
+            _log.debug("No arrival time info for trip " + trip.getTripId());
             continue;
           }
           formattedTime = formattedTime.substring(formattedTime.indexOf('T')+1, formattedTime.indexOf('T') + 9);
@@ -549,21 +545,16 @@ public class FeedServiceImpl implements FeedService {
         }
       }
     }
-    _log.info("Stop id before mapping: " + stopId);
+    _log.debug("Stop id before mapping: " + stopId);
     if (stopId != null) {
-      stopId = getStopMapping().get(stopId);
+      String direction = getTripDirection(trip);
+      stopId = getGTFSStop(stopId, direction);
     }
 
     if (stopId == null || stopId.isEmpty()) {
       _log.info("stopid is null for trip " + trip.getTripId() + " and stop " + trip.getLastStopName());
     }
-    //String direction = getTripDirection(trip);
-    String direction = "0"; 		// Default to south, outbound
-    if (trip.getDirection() == null) {
-      _log.info("No trip direction provided for trip " + trip.getTripId() + ". Defaulting to outbound.");
-    } else if (trip.getDirection().equals("N")) {
-    	direction = "1";
-    }
+    String direction = getTripDirection(trip);
     String tripId = getTripForStop(stopId, direction, scheduledTime);
     if (tripId == null) {
       _log.info("trip id is null");
@@ -754,5 +745,35 @@ public class FeedServiceImpl implements FeedService {
       this.direction = direction;
       this.offset = offset;
     }
+  }
+
+  private String getTripDirection(TripInfo trip) {
+    String direction = "0";     // Default to south, outbound
+    if (trip.getDirection() == null) {
+      _log.info("No trip direction provided for trip " + trip.getTripId() + ". Defaulting to outbound.");
+    } else if (trip.getDirection().equals("N")) {
+      direction = "1";
+    }
+    return direction;
+  }
+
+  private String getGTFSStop(String stopId, String direction) {
+    String mappedStopId = "";
+    if (stopId != null) {
+      mappedStopId = getStopMapping().get(stopId);
+    }
+
+    if (mappedStopId != null && !mappedStopId.isEmpty()) {
+      // Check for special case at Sea-Tac Airport, where both northbound 
+      // and southbound trains have an AVL stop id of "SEA_PLAT".
+      if (mappedStopId.equals("99903") || mappedStopId.equals("99904")) {
+        if (direction == "0") {
+          mappedStopId = "99904";
+        } else {
+          mappedStopId = "99903";
+        }
+      }
+    }
+    return mappedStopId;
   }
 }
