@@ -581,7 +581,7 @@ public class FeedServiceImpl implements FeedService {
     }
 
     td.setTripId(tripId);
-    td.setScheduleRelationship(ScheduleRelationship.UNSCHEDULED);
+    td.setScheduleRelationship(ScheduleRelationship.SCHEDULED);
     td.setRouteId(_linkRouteId);
 
     return td.build();
@@ -631,7 +631,8 @@ public class FeedServiceImpl implements FeedService {
     List<TripEntry> allTrips = _transitGraphDao.getAllTrips();
     List<TripEntry> linkTrips = new ArrayList<TripEntry>();
     for (TripEntry trip : allTrips) {
-      if (trip.getRoute().getId().getId().equals(routeId) && trip.getBlock().getId().getId().equals(trip.getId().getId())) {
+      //if (trip.getRoute().getId().getId().equals(routeId) && trip.getBlock().getId().getId().equals(trip.getId().getId())) {
+      if (trip.getRoute().getId().getId().equals(routeId)) {
         linkTrips.add(trip);
       }
     }
@@ -748,12 +749,46 @@ public class FeedServiceImpl implements FeedService {
   }
 
   private String getTripDirection(TripInfo trip) {
-    String direction = "0";     // Default to south, outbound
+    String direction = "";
     if (trip.getDirection() == null) {
-      _log.info("No trip direction provided for trip " + trip.getTripId() + ". Defaulting to outbound.");
+      // No direction provided, so check for a stop starting with "NB" or "SB".
+      String stopId = (String) trip.getLastStopId();
+      if (stopId != null) {
+        if (stopId.startsWith("SB")) {
+          direction = "0";
+        } else if (stopId.startsWith("NB")) {
+          direction = "1";
+        }
+      }
+      if (direction.isEmpty()) {    // Check the StopIds in Updates
+        StopUpdatesList stopTimeUpdateList = trip.getStopUpdates();
+        List<StopUpdate> stopTimeUpdates = stopTimeUpdateList.getUpdates();
+        if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
+          for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
+            stopId = stopTimeUpdate.getStopId();
+            if (stopId != null) {
+              if (stopId.startsWith("SB")) {
+                direction = "0";
+                break;
+              } else if (stopId.startsWith("NB")) {
+                direction = "1";
+                break;
+              }
+            }
+          }
+        }
+      }
     } else if (trip.getDirection().equals("N")) {
       direction = "1";
+    } else if (trip.getDirection().equals("S")) {
+      direction = "0";
     }
+    
+    if (direction.isEmpty()) {
+      _log.info("No trip direction provided or inferred for trip " + trip.getTripId() + ". Defaulting to outbound.");
+      direction = "0";     // Default to south, outbound
+    }
+
     return direction;
   }
 
