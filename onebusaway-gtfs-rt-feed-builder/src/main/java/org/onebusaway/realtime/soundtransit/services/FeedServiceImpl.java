@@ -605,6 +605,10 @@ public class FeedServiceImpl implements FeedService {
         }
         // If this is the earliest time, use it for the trip start time
         if (arrival != null) {
+          // Invalid dates start with a year of "1899". so ignore them.
+          if (arrival.startsWith("1899")) {
+            continue;
+          }
           Date parsedDate = null;
           try {
             DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");

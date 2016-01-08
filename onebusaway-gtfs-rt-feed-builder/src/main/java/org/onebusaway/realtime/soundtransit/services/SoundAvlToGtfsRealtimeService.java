@@ -55,6 +55,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   private URL _linkAvlFeedUrl;
 
   private String _url = null;
+  private int _refreshOffset = 0;  // Default to refresh on the minute
   private int _refreshInterval = 60;
   
   private FeedMessage vehiclePositionsFM = null;
@@ -62,8 +63,12 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   private static long _lastUpdateTime = System.currentTimeMillis();
 
 
-  public void setRefreshInterval(int interval) {
-    _refreshInterval = interval;
+  public void setRefreshOffset(String refreshOffset) {
+    this._refreshOffset = Integer.parseInt(refreshOffset);
+  }
+
+  public void setRefreshInterval(String interval) {
+    _refreshInterval = Integer.parseInt(interval);
   }
 
   public void setConnectionUrl(String jdbcConnectionString) {
@@ -99,8 +104,10 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   public void start() throws Exception {
     _log.info("starting GTFS-realtime service");
     _feedService.init();
+    int delay = ((_refreshOffset + 60) - (int)(System.currentTimeMillis()/1000 % 60)) % 60;
+    _log.info("Offset: " + _refreshOffset + ", delay: " + delay);
     _refreshExecutor = Executors.newSingleThreadScheduledExecutor();
-    _refreshExecutor.scheduleAtFixedRate(new RefreshTransitData(), 0,
+    _refreshExecutor.scheduleAtFixedRate(new RefreshTransitData(), delay,
         _refreshInterval, TimeUnit.SECONDS);
 
     _delayExecutor = Executors.newSingleThreadScheduledExecutor();
