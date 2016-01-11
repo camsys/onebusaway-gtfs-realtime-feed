@@ -583,9 +583,13 @@ public class FeedServiceImpl implements FeedService {
         String arrival = null;
         if (arrivalTimeDetails != null) {
           arrival = arrivalTimeDetails.getActual();
-          if (arrival != null && arrival.startsWith("1899")) {
+          //if (arrival != null && arrival.startsWith("1899")) {
             // Sometimes "1899" shows up in the AVL feed.
-            arrival = null;
+            //arrival = null;
+          //}
+          // Skip all stops that have already happened.
+          if (arrival != null) {
+            continue;
           }
         }
         // If "Actual" is null, the stop hasn't happened yet, so use the
