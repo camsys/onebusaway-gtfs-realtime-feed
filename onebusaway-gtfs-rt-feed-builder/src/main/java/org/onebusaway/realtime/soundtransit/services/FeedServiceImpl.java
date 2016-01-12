@@ -536,31 +536,24 @@ public class FeedServiceImpl implements FeedService {
         }          
         //StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
         ArrivalTime arrivalTimeDetails = stopTimeUpdate.getArrivalTime();
-        String arrival = null;
+        String scheduledArrival = null;
         if (arrivalTimeDetails != null) {
-          arrival = arrivalTimeDetails.getScheduled();
+          scheduledArrival = arrivalTimeDetails.getScheduled();
         }
         //DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
         // If this is the earliest time, use it for the trip start time
-        if (arrival != null) { 
+        if (scheduledArrival != null) { 
           try {
             Date parsedDate = null;
             DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
-            parsedDate = df.parse(arrival);
+            parsedDate = df.parse(scheduledArrival);
             if ((tripStartTime == null) || (parsedDate.before(tripStartTime))) {
               tripStartTime = parsedDate;
             }
           } catch (Exception e) {
             System.out.println("Exception parsing Estimated time: "
-                + arrival);
+                + scheduledArrival);
           }
-          /*
-          if (tripStartTime == null) {
-            tripStartTime = parsedDate;
-          } else if (parsedDate.before(tripStartTime)) {
-            tripStartTime = parsedDate;
-          }
-          */
         }
       }
     }
@@ -568,9 +561,11 @@ public class FeedServiceImpl implements FeedService {
   }
   
   private List<StopTimeUpdate> buildStopTimeUpdates(TripInfo trip) {
+    StopUpdate lastCompletedStop = null;
     List<StopTimeUpdate> stopTimeUpdateList = new ArrayList<StopTimeUpdate>();
     StopUpdatesList stopTimeUpdateData = trip.getStopUpdates();
     List<StopUpdate> stopTimeUpdates = stopTimeUpdateData.getUpdates();
+    boolean lastCompletedStopAdded = false;
     if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
       for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
         if (stopTimeUpdate.getStopId() == null
@@ -578,48 +573,105 @@ public class FeedServiceImpl implements FeedService {
             || stopTimeUpdate.getStopId().equals(PINE_STREET_STUB)) {
           continue;
         }          
-        StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
         ArrivalTime arrivalTimeDetails = stopTimeUpdate.getArrivalTime();
-        String arrival = null;
         if (arrivalTimeDetails != null) {
-          arrival = arrivalTimeDetails.getActual();
+          String arrivalTime = arrivalTimeDetails.getActual();
           //if (arrival != null && arrival.startsWith("1899")) {
             // Sometimes "1899" shows up in the AVL feed.
             //arrival = null;
           //}
           // Skip all stops that have already happened.
-          if (arrival != null) {
-            continue;
-          }
-        }
-        // If "Actual" is null, the stop hasn't happened yet, so use the
-        // "Estimated" time for the arrival time.
-        if (arrival == null && arrivalTimeDetails != null) {
-          arrival = arrivalTimeDetails.getEstimated();
-        }
-        if (arrival != null) {
-          try {
-            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-            Date parsedDate = df.parse(arrival);
-            StopTimeEvent.Builder ste = StopTimeEvent.newBuilder();
-            ste.setTime(parsedDate.getTime() / 1000);
+          //if (arrival != null) {
+          //  continue;
+          //}
 
-            String stopId = stopTimeUpdate.getStopId();
-            if (stopId != null) {
-              String direction = getTripDirection(trip);
-              stopId = getGTFSStop(stopId, direction);
-              if (stopId == null) {
-                continue; // No mapping for this stop, so don't add it.
+          if (arrivalTime != null) {    // Stop has been completed
+            //if (!lastCompletedStopAdded) {
+              
+              /*
+               * Debugging: for now, include all the updates
+               */
+              
+              StopTimeUpdate completedStopTimeUpdate = 
+                  buildStopTimeUpdate(stopTimeUpdate.getStopId(),
+                      stopTimeUpdate.getArrivalTime().getActual(), 
+                      getTripDirection(trip));
+              stopTimeUpdateList.add(completedStopTimeUpdate);
+              lastCompletedStopAdded = true;
+              _log.debug("Added completed stops: " + stopTimeUpdate.getStopId());
+              
+              
+              if (lastCompletedStop == null) {
+                lastCompletedStop = stopTimeUpdate;
+              } else {
+                try {
+                  DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
+                  Date thisArrivalTime = df.parse(arrivalTime);
+                  Date previousArrivalTime = 
+                      df.parse(lastCompletedStop.getArrivalTime().getActual());
+                  if (previousArrivalTime.before(thisArrivalTime)) {
+                    lastCompletedStop = stopTimeUpdate;
+                    _log.debug ("last completed stop: " + lastCompletedStop.getStopId());
+                  }
+                } catch (Exception e) {
+                  _log.error("Exception parsing arrival time: " 
+                      + arrivalTime + ", " 
+                      + lastCompletedStop.getArrivalTime().getActual());
+                }
               }
-              stu.setStopId(stopId);
-              stu.setArrival(ste);
-              stu.setDeparture(ste);
+            //}
+          } else {    // Stop has not been completed
+            StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
+            // Before adding the first upcoming stop, add in the last
+            // completed stop.
+            /*
+            if (!lastCompletedStopAdded && lastCompletedStop != null) {
+              //StopTimeUpdate.Builder stuCompleted = StopTimeUpdate.newBuilder();
+              StopTimeUpdate completedStopTimeUpdate = 
+                  buildStopTimeUpdate(lastCompletedStop.getStopId(),
+                      lastCompletedStop.getArrivalTime().getActual(), 
+                      getTripDirection(trip));
+              stopTimeUpdateList.add(completedStopTimeUpdate);
+              lastCompletedStopAdded = true;
+              _log.info("Added completed stop: " + lastCompletedStop.getStopId());
             }
-          } catch (Exception e) {
-            _log.error("Exception parsing Estimated time: " + arrival);
+            */
+            
+            // If "Actual" is null, the stop hasn't happened yet, so use the
+            // "Estimated" time for the arrival time.
+            arrivalTime = arrivalTimeDetails.getEstimated();
+            if (arrivalTime != null) {
+              
+              try {
+                DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
+                Date parsedDate = df.parse(arrivalTime);
+                StopTimeEvent.Builder ste = StopTimeEvent.newBuilder();
+                ste.setTime(parsedDate.getTime() / 1000);
+    
+                String stopId = stopTimeUpdate.getStopId();
+                if (stopId != null) {
+                  String direction = getTripDirection(trip);
+                  stopId = getGTFSStop(stopId, direction);
+                  if (stopId == null) {
+                    continue; // No mapping for this stop, so don't add it.
+                  }
+                  stu.setStopId(stopId);
+                  stu.setArrival(ste);
+                  stu.setDeparture(ste);
+                }
+              } catch (Exception e) {
+                _log.error("Exception parsing Estimated time: " + arrivalTime);
+              }
+              
+              
+            }
+            stopTimeUpdateList.add(stu.build());
+
           }
+          
         }
-        stopTimeUpdateList.add(stu.build());
+        
+        
       }
     }
     return stopTimeUpdateList;
@@ -687,7 +739,7 @@ public class FeedServiceImpl implements FeedService {
      * DEFAULT_TRIP_ID; } }
      */
     // Set trip start time and date from tripStartTime
-    Date tripStartTime = getTripStartTime(trip);
+    Date tripStartTime = getTripStartTime(trip.getStopUpdates());
     if (tripStartTime != null) {
       DateFormat df = new SimpleDateFormat("kk:mm:ss");
       String startTime = df.format(tripStartTime);
@@ -752,6 +804,7 @@ public class FeedServiceImpl implements FeedService {
     return;
   }
   */
+  /*
   private Date getTripStartTime(TripInfo trip) {
     Date tripStartTime = null;
 
@@ -796,6 +849,7 @@ public class FeedServiceImpl implements FeedService {
     }
     return tripStartTime;
   }
+  */
   
   private List<TripEntry> getLinkTrips() {
     String routeId = _linkRouteId;
@@ -815,7 +869,28 @@ public class FeedServiceImpl implements FeedService {
     
     return linkTrips;
   }
-  
+
+  private StopTimeUpdate buildStopTimeUpdate(String stopId, String arrivalTime, String direction) {
+    StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
+    try {
+      DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
+      Date parsedDate = df.parse(arrivalTime);
+      StopTimeEvent.Builder ste = StopTimeEvent.newBuilder();
+      ste.setTime(parsedDate.getTime() / 1000);
+      if (stopId != null) {
+        stopId = getGTFSStop(stopId, direction);
+        if (stopId != null) {
+          stu.setStopId(stopId);
+          stu.setArrival(ste);
+          stu.setDeparture(ste);
+        }
+      }
+    } catch (Exception e) {
+    _log.error("Exception parsing Estimated time: " + arrivalTime);
+    }
+    return stu.build();
+  }
+
   private String getTripForStop(String stopId, String direction, int scheduledTime) {
     int offset = 0;
     for (StopOffset stopOffset : stopOffsets) {
