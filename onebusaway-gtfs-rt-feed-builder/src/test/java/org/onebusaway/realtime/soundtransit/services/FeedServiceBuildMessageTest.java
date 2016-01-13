@@ -103,7 +103,7 @@ public class FeedServiceBuildMessageTest {
 
   @Test
   public void testBuildVPMessage() {
-    assertEquals(3, vehiclePositionsFM_2.getEntityCount());
+    assertEquals(3, vehiclePositionsFM_1.getEntityCount());
     List<FeedEntity> vehicleList = vehiclePositionsFM_1.getEntityList();
     for (FeedEntity vehicle : vehicleList) {
       VehiclePosition vp = vehicle.getVehicle();
@@ -120,7 +120,7 @@ public class FeedServiceBuildMessageTest {
 
   @Test
   public void testBuildVPMessageMissingStopUpdates() {
-    assertEquals(3, vehiclePositionsFM_2.getEntityCount());
+    assertEquals(2, vehiclePositionsFM_2.getEntityCount());
     List<FeedEntity> vehicleList = vehiclePositionsFM_2.getEntityList();
     for (FeedEntity vehicle : vehicleList) {
       VehiclePosition vp = vehicle.getVehicle();
