@@ -158,41 +158,6 @@ public class FeedServiceImpl implements FeedService {
     this.stopMapping = stopMapping;
   }
 
-  /*
-  public Map<String, String> getTripMapping() {
-    if (tripMapping == null) {
-      BufferedReader br = null;
-      try {
-        tripMapping = new HashMap<String, String>();
-        String ln = "";
-        br = new BufferedReader(new FileReader(
-            "/var/lib/obanyc/gtfs-rt/AvlTripMapping.txt"));
-        while ((ln = br.readLine()) != null) {
-          int idx = ln.indexOf(',');
-          if (idx > 0) {
-            tripMapping.put(ln.substring(0, idx), ln.substring(idx + 1));
-          }
-        }
-      } catch (IOException e) {
-        _log.error("Error reading TripMapping file " + e.getMessage());
-      } finally {
-        try {
-          br.close();
-        } catch (IOException e) {
-          _log.error("Exception closing file reader: " + e.getMessage());
-        }
-      }
-    }
-    return tripMapping;
-  }
-  */
-
-  /*
-  public void setTripMapping(Map<String, String> tripMapping) {
-    this.tripMapping = tripMapping;
-  }
-  */
-
   public void init() {
 	  if (_tripEntries == null) {  // Should be null unless unit test injects a value.
 	    _tripEntries = getLinkTrips();
@@ -256,8 +221,47 @@ public class FeedServiceImpl implements FeedService {
     if (parseFailed) {
       return null;
     }
-
+    // The AVL feed occasionally has dates from 1899.  That apparently is some
+    // sort of default value for their system.
+    // Convert any "1899" dates in ArrivalTime to today
+    TripInfoList tripInfoList = linkAVLData.getTrips();
+    List<TripInfo> trips = tripInfoList.getTrips();
+    for (TripInfo trip : trips) {
+      StopUpdatesList stopUpdatesList = trip.getStopUpdates();
+      List<StopUpdate> stopUpdates = stopUpdatesList.getUpdates();
+      if (stopUpdates != null && stopUpdates.size() > 0) {
+        for (StopUpdate stopTimeUpdate : stopUpdates) {
+          ArrivalTime arrivalTime = stopTimeUpdate.getArrivalTime();
+          if (arrivalTime != null) {
+            String actual = arrivalTime.getActual();
+            String estimated = arrivalTime.getEstimated();
+            String scheduled = arrivalTime.getScheduled();
+            if (actual != null && actual.startsWith("1899")) {
+              actual = convert1899Date(actual);
+              arrivalTime.setActual(actual);
+            }
+            if (estimated != null && estimated.startsWith("1899")) {
+              estimated = convert1899Date(estimated);
+              arrivalTime.setEstimated(estimated);
+            }
+            if (scheduled != null && scheduled.startsWith("1899")) {
+              scheduled = convert1899Date(scheduled);
+              arrivalTime.setScheduled(scheduled);
+            }
+          }
+        }
+      }
+    }
+    
     return linkAVLData;
+  }
+  
+  private String convert1899Date(String oldDateString) {
+    SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+    String today = formatter.format(new Date());
+    String todaysDateString = today 
+        + oldDateString.substring(oldDateString.indexOf("T"));
+    return todaysDateString;
   }
 
   public FeedMessage buildVPMessage(LinkAVLData linkAVLData) {
@@ -277,8 +281,9 @@ public class FeedServiceImpl implements FeedService {
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
         String vehicleId = "";
-        // Use trip id as vehicle id to avoid issues with vehicle id
-        // changing if train backs up.
+        // Use trip id from AVL, which is actually their "train label", 
+        // as vehicle id to avoid issues with vehicle id changing if train 
+        // backs up.
         if (trip.getTripId() != null) {
           vehicleId = trip.getTripId();
         }
@@ -296,24 +301,7 @@ public class FeedServiceImpl implements FeedService {
           _log.info("Vehicle latitude/longitude for vehicle " + vehicleId
               + " could not be parsed");
         }
-
-        // String stopId = (String) trip.getLastStopId();
-        //setVpStopAndStatus(vp, trip);
-        /*
-        if (stopId == null) {
-          stopId = "";
-        } else {
-          String direction = getTripDirection(trip);
-          stopId = getGTFSStop(stopId, direction);
-          if (stopId == null) {
-            _log.info("Could not map stop: " + (String) trip.getLastStopId());
-            stopId = "";
-          }
-        }
-        vp.setStopId(stopId);
-        */
         vp.setTimestamp(System.currentTimeMillis()/1000);
-        //vp.setCurrentStatus(VehiclePosition.VehicleStopStatus.INCOMING_AT);
         StopUpdate nextStop = findNextStopOnTrip(trip.getStopUpdates());
         if (nextStop == null) {
           _log.info("Cannot determine next stop id for trip " + trip.getTripId());
@@ -341,53 +329,10 @@ public class FeedServiceImpl implements FeedService {
         }
         vp.setCurrentStatus(status);
 
-        //String nextStop = findNextStopOnTrip(trip);
         // Loop through StopUpdates to determine the trip start time and date.
         // Initially, set nextStopTime to an arbitrarily high value.
         Calendar cal = Calendar.getInstance();
         cal.set(2099, 12, 31);
-        Date nextStopTime = cal.getTime();
-        //Date tripStartTime = null;
-        Date tripStartTime = getTripStartTime(trip.getStopUpdates());
-        /*
-        StopUpdatesList stopTimeUpdateList = trip.getStopUpdates();
-        List<StopUpdate> stopTimeUpdates = stopTimeUpdateList.getUpdates();
-        if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
-          for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
-            StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
-            ArrivalTime arrivalTime = stopTimeUpdate.getArrivalTime();
-            String arrival = null;
-            if (arrivalTime != null) {
-              arrival = arrivalTime.getActual();
-            }
-            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
-            if (arrival != null) { // If this is the earliest time, use it for
-                                   // the trip start time
-              Date parsedDate = null;
-              try {
-                parsedDate = df.parse(arrival);
-              } catch (Exception e) {
-                System.out.println("Exception parsing Estimated time: "
-                    + arrival);
-              }
-              if (tripStartTime == null) {
-                tripStartTime = parsedDate;
-              } else if (parsedDate.before(tripStartTime)) {
-                tripStartTime = parsedDate;
-              }
-            }
-          }
-        }
-        */
-        // Reset stop id to next stop if it was unmapped
-        /*
-        if (stopId == "") {
-          String direction = getTripDirection(trip);
-          if (getGTFSStop(nextStop, direction) != null) {
-            vp.setStopId(getGTFSStop(nextStop, direction));
-          }
-        }
-        */
         TripDescriptor td = buildTripDescriptor(trip);
         vp.setTrip(td);
 
@@ -399,8 +344,6 @@ public class FeedServiceImpl implements FeedService {
       }
     } else {
       // TODO: decide what to do if no data is found.
-      // Map<String, String> feedResult = (Map<String, String>)
-      // parsedAvlUpdates.get("Fault");
     }
     vehiclePositionsFM = feedMessageBuilder.build();
     if (vehiclePositionsFM != null) {
@@ -524,7 +467,6 @@ public class FeedServiceImpl implements FeedService {
   private Date getTripStartTime(StopUpdatesList stopTimeUpdatesList) {
     Calendar cal = Calendar.getInstance();
     cal.set(2099, 12, 31);
-    Date nextStopTime = cal.getTime();
     Date tripStartTime = null;
     List<StopUpdate> stopTimeUpdates = stopTimeUpdatesList.getUpdates();
     if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
@@ -561,117 +503,30 @@ public class FeedServiceImpl implements FeedService {
   }
   
   private List<StopTimeUpdate> buildStopTimeUpdates(TripInfo trip) {
-    StopUpdate lastCompletedStop = null;
     List<StopTimeUpdate> stopTimeUpdateList = new ArrayList<StopTimeUpdate>();
-    StopUpdatesList stopTimeUpdateData = trip.getStopUpdates();
-    List<StopUpdate> stopTimeUpdates = stopTimeUpdateData.getUpdates();
-    boolean lastCompletedStopAdded = false;
-    if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
-      for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
-        if (stopTimeUpdate.getStopId() == null
-            || stopTimeUpdate.getStopId().isEmpty()
-            || stopTimeUpdate.getStopId().equals(PINE_STREET_STUB)) {
+    StopUpdatesList stopUpdateData = trip.getStopUpdates();
+    List<StopUpdate> stopUpdates = stopUpdateData.getUpdates();
+    //boolean lastCompletedStopAdded = false;
+    if (stopUpdates != null && stopUpdates.size() > 0) {
+      for (StopUpdate stopUpdate : stopUpdates) {
+        if (stopUpdate.getStopId() == null
+            || stopUpdate.getStopId().isEmpty()
+            || stopUpdate.getStopId().equals(PINE_STREET_STUB)) {
           continue;
         }          
-        ArrivalTime arrivalTimeDetails = stopTimeUpdate.getArrivalTime();
+        ArrivalTime arrivalTimeDetails = stopUpdate.getArrivalTime();
         if (arrivalTimeDetails != null) {
           String arrivalTime = arrivalTimeDetails.getActual();
-          //if (arrival != null && arrival.startsWith("1899")) {
-            // Sometimes "1899" shows up in the AVL feed.
-            //arrival = null;
-          //}
-          // Skip all stops that have already happened.
-          //if (arrival != null) {
-          //  continue;
-          //}
-
-          if (arrivalTime != null) {    // Stop has been completed
-            //if (!lastCompletedStopAdded) {
-              
-              /*
-               * Debugging: for now, include all the updates
-               */
-              
-              StopTimeUpdate completedStopTimeUpdate = 
-                  buildStopTimeUpdate(stopTimeUpdate.getStopId(),
-                      stopTimeUpdate.getArrivalTime().getActual(), 
-                      getTripDirection(trip));
-              stopTimeUpdateList.add(completedStopTimeUpdate);
-              lastCompletedStopAdded = true;
-              _log.debug("Added completed stops: " + stopTimeUpdate.getStopId());
-              
-              
-              if (lastCompletedStop == null) {
-                lastCompletedStop = stopTimeUpdate;
-              } else {
-                try {
-                  DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-                  Date thisArrivalTime = df.parse(arrivalTime);
-                  Date previousArrivalTime = 
-                      df.parse(lastCompletedStop.getArrivalTime().getActual());
-                  if (previousArrivalTime.before(thisArrivalTime)) {
-                    lastCompletedStop = stopTimeUpdate;
-                    _log.debug ("last completed stop: " + lastCompletedStop.getStopId());
-                  }
-                } catch (Exception e) {
-                  _log.error("Exception parsing arrival time: " 
-                      + arrivalTime + ", " 
-                      + lastCompletedStop.getArrivalTime().getActual());
-                }
-              }
-            //}
-          } else {    // Stop has not been completed
-            StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
-            // Before adding the first upcoming stop, add in the last
-            // completed stop.
-            /*
-            if (!lastCompletedStopAdded && lastCompletedStop != null) {
-              //StopTimeUpdate.Builder stuCompleted = StopTimeUpdate.newBuilder();
-              StopTimeUpdate completedStopTimeUpdate = 
-                  buildStopTimeUpdate(lastCompletedStop.getStopId(),
-                      lastCompletedStop.getArrivalTime().getActual(), 
-                      getTripDirection(trip));
-              stopTimeUpdateList.add(completedStopTimeUpdate);
-              lastCompletedStopAdded = true;
-              _log.info("Added completed stop: " + lastCompletedStop.getStopId());
-            }
-            */
-            
-            // If "Actual" is null, the stop hasn't happened yet, so use the
-            // "Estimated" time for the arrival time.
+          if (arrivalTime == null) {
             arrivalTime = arrivalTimeDetails.getEstimated();
-            if (arrivalTime != null) {
-              
-              try {
-                DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-                Date parsedDate = df.parse(arrivalTime);
-                StopTimeEvent.Builder ste = StopTimeEvent.newBuilder();
-                ste.setTime(parsedDate.getTime() / 1000);
-    
-                String stopId = stopTimeUpdate.getStopId();
-                if (stopId != null) {
-                  String direction = getTripDirection(trip);
-                  stopId = getGTFSStop(stopId, direction);
-                  if (stopId == null) {
-                    continue; // No mapping for this stop, so don't add it.
-                  }
-                  stu.setStopId(stopId);
-                  stu.setArrival(ste);
-                  stu.setDeparture(ste);
-                }
-              } catch (Exception e) {
-                _log.error("Exception parsing Estimated time: " + arrivalTime);
-              }
-              
-              
-            }
-            stopTimeUpdateList.add(stu.build());
-
           }
-          
+          if (arrivalTime != null) {
+            StopTimeUpdate stopTimeUpdate = 
+                buildStopTimeUpdate(stopUpdate.getStopId(),
+                    arrivalTime, getTripDirection(trip));
+            stopTimeUpdateList.add(stopTimeUpdate);
+          }
         }
-        
-        
       }
     }
     return stopTimeUpdateList;
@@ -731,13 +586,6 @@ public class FeedServiceImpl implements FeedService {
       _log.info("trip id is null");
       tripId = "";
     }
-    /*
-     * else { _log.info("Mapping trip: " + tripId); tripId =
-     * getTripMapping().get(tripId); // Set unmapped trips to the default trip
-     * id if (tripId == null) { _log.info("Could not map trip " +
-     * trip.get("TripId") + ". Defaulting to trip " + DEFAULT_TRIP_ID); tripId =
-     * DEFAULT_TRIP_ID; } }
-     */
     // Set trip start time and date from tripStartTime
     Date tripStartTime = getTripStartTime(trip.getStopUpdates());
     if (tripStartTime != null) {
@@ -750,112 +598,14 @@ public class FeedServiceImpl implements FeedService {
     } else {
       _log.info("Null tripStartTime for trip " + tripId);
     }
-
     td.setTripId(tripId);
     td.setScheduleRelationship(ScheduleRelationship.SCHEDULED);
     td.setRouteId(_linkRouteId);
-
     return td.build();
   }
-  /*
-  private void setVpStopAndStatus(VehiclePosition.Builder vp, TripInfo trip) {
-    String nextStopId = "";
-    String lastStopId = "";
-    VehiclePosition.VehicleStopStatus status = null;
-
-    StopUpdatesList stopTimeUpdateData = trip.getStopUpdates();
-    List<StopUpdate> stopTimeUpdates = stopTimeUpdateData.getUpdates();
-    */
-    /* 
-     * Loop through the list of StopTimeUpdates checking arrival times.  The 
-     * first one without an actual arrival time is assumed to be the next 
-     * station.  StopId is set to that and the status is set to IN_TRANSIT_TO. 
-     * If all the stops have actual arrival times, the trip must be finished.  
-     * The StopId is set to the last stop in the list and status is set to 
-     * STOPPED_AT.
-     */
-  /*
-    if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
-      for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
-        if (stopTimeUpdate.getStopId() == null || stopTimeUpdate.getStopId().isEmpty()) {
-          continue;
-        }          
-        String stopId = stopTimeUpdate.getStopId();
-        if (stopTimeUpdate.getArrivalTime() == null) {
-          _log.debug("No arrival time info for trip " + trip.getTripId());
-          continue;
-        }
-        if (stopTimeUpdate.getArrivalTime().getActual() == null) {
-          nextStopId = stopId;
-          status = VehiclePosition.VehicleStopStatus.IN_TRANSIT_TO;
-          break;
-        } else {
-          lastStopId = stopId;
-        }
-      }
-    }
-    if (nextStopId.isEmpty()) {  // Must be at end of the line.
-      nextStopId = lastStopId;
-      status = VehiclePosition.VehicleStopStatus.STOPPED_AT;
-    }
-    
-    // Map Stop Id to GTFS stop id
-
-    return;
-  }
-  */
-  /*
-  private Date getTripStartTime(TripInfo trip) {
-    Date tripStartTime = null;
-
-    // Check each StopTimeUpdate to find the earliest stop arrival time
-    StopUpdatesList stopTimeUpdateData = trip.getStopUpdates();
-    List<StopUpdate> stopTimeUpdates = stopTimeUpdateData.getUpdates();
-    if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
-      for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
-        if (stopTimeUpdate.getStopId() == null
-            || stopTimeUpdate.getStopId().isEmpty()
-            || stopTimeUpdate.getStopId().equals(PINE_STREET_STUB)) {
-          continue;
-        }          
-        ArrivalTime arrivalTime = stopTimeUpdate.getArrivalTime();
-        String arrival = null;
-        if (arrivalTime != null) {
-          arrival = arrivalTime.getActual();
-        }
-        if (arrival == null) { // No Actual time, so use Estimated
-          arrival = arrivalTime.getEstimated();
-        }
-        // If this is the earliest time, use it for the trip start time
-        if (arrival != null) {
-          // Invalid dates start with a year of "1899". so ignore them.
-          if (arrival.startsWith("1899")) {
-            continue;
-          }
-          Date parsedDate = null;
-          try {
-            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
-            parsedDate = df.parse(arrival);
-          } catch (Exception e) {
-            System.out.println("Exception parsing Estimated time: " + arrival);
-          }
-          if (tripStartTime == null) {
-            tripStartTime = parsedDate;
-          } else if (parsedDate.before(tripStartTime)) {
-            tripStartTime = parsedDate;
-          }
-        }
-      }
-    }
-    return tripStartTime;
-  }
-  */
   
   private List<TripEntry> getLinkTrips() {
     String routeId = _linkRouteId;
-    //if (routeId.contains("_")) {
-    //  routeId = routeId.substring(routeId.indexOf('_')+1);
-    //}
     List<TripEntry> allTrips = _transitGraphDao.getAllTrips();
     List<TripEntry> linkTrips = new ArrayList<TripEntry>();
     for (TripEntry trip : allTrips) {
@@ -909,7 +659,6 @@ public class FeedServiceImpl implements FeedService {
         }
         continue;
       }
-      int startTimeInSecs = getTripStartTimeInSecs(tripEntry);
       if (tripStartTime < getTripStartTimeInSecs(tripEntry)) {
         if (lastTrip != null) {
           tripId = lastTrip.getId().getId();
