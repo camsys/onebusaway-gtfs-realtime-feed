@@ -18,7 +18,6 @@ package org.onebusaway.realtime.soundtransit.services;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
-import java.net.URL;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -41,17 +40,16 @@ import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.realtime.soundtransit.model.TripInfoList;
-import org.onebusaway.transit_data_federation.services.transit_graph.AgencyEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.FrequencyEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
-import org.onebusaway.util.services.configuration.ConfigurationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.google.transit.realtime.GtfsRealtime;
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
 import com.google.transit.realtime.GtfsRealtime.FeedHeader;
 import com.google.transit.realtime.GtfsRealtime.FeedHeader.Incrementality;
@@ -167,34 +165,34 @@ public class FeedServiceImpl implements FeedService {
 	  // TBD: construct the tables dynamically
 	  stopOffsets = new ArrayList<StopOffset>();
 	  // Add in Southbound stops
-	  stopOffsets.add(new StopOffset("1108", "0", 0));
-    stopOffsets.add(new StopOffset("455", "0", 2));
-    stopOffsets.add(new StopOffset("501", "0", 4));
-    stopOffsets.add(new StopOffset("623", "0", 7));
-    stopOffsets.add(new StopOffset("99101", "0", 9));
-    stopOffsets.add(new StopOffset("99111", "0", 11));
-    stopOffsets.add(new StopOffset("99121", "0", 14));
-    stopOffsets.add(new StopOffset("55949", "0", 16));
-    stopOffsets.add(new StopOffset("56039", "0", 19));
-    stopOffsets.add(new StopOffset("56159", "0", 23));
-    stopOffsets.add(new StopOffset("56173", "0", 26));
-    stopOffsets.add(new StopOffset("99900", "0", 35));
-    stopOffsets.add(new StopOffset("99904", "0", 38));
+	  stopOffsets.add(new StopOffset("1108", "SB1029T", "0", 0));
+    stopOffsets.add(new StopOffset("455", "SB1047T", "0", 2));
+    stopOffsets.add(new StopOffset("501", "SB1070T", "0", 4));
+    stopOffsets.add(new StopOffset("623", "SB1087T", "0", 7));
+    stopOffsets.add(new StopOffset("99101", "SB113T", "0", 9));
+    stopOffsets.add(new StopOffset("99111", "SB148T", "0", 11));
+    stopOffsets.add(new StopOffset("99121", "SB210T", "0", 14));
+    stopOffsets.add(new StopOffset("55949", "SB255T", "0", 16));
+    stopOffsets.add(new StopOffset("56039", "SB312T", "0", 19));
+    stopOffsets.add(new StopOffset("56159", "SB417T", "0", 23));
+    stopOffsets.add(new StopOffset("56173", "SB469T", "0", 26));
+    stopOffsets.add(new StopOffset("99900", "SB778T", "0", 35));
+    stopOffsets.add(new StopOffset("99904", "SEA_PLAT", "0", 38));
 	  
 	  // Add in Northbound stops
-    stopOffsets.add(new StopOffset("99903", "1", 0));
-    stopOffsets.add(new StopOffset("99905", "1", 3));
-    stopOffsets.add(new StopOffset("55578", "1", 12));
-    stopOffsets.add(new StopOffset("55656", "1", 15));
-    stopOffsets.add(new StopOffset("55778", "1", 19));
-    stopOffsets.add(new StopOffset("55860", "1", 22));
-    stopOffsets.add(new StopOffset("99240", "1", 24));
-    stopOffsets.add(new StopOffset("99256", "1", 27));
-    stopOffsets.add(new StopOffset("99260", "1", 29));
-    stopOffsets.add(new StopOffset("621", "1", 31));
-    stopOffsets.add(new StopOffset("532", "1", 34));
-    stopOffsets.add(new StopOffset("565", "1", 36));
-    stopOffsets.add(new StopOffset("1121", "1", 38));
+    stopOffsets.add(new StopOffset("99903", "SEA_PLAT", "1", 0));
+    stopOffsets.add(new StopOffset("99905", "NB782T", "1", 3));
+    stopOffsets.add(new StopOffset("55578", "NB484T", "1", 12));
+    stopOffsets.add(new StopOffset("55656", "NB435T", "1", 15));
+    stopOffsets.add(new StopOffset("55778", "NB331T", "1", 19));
+    stopOffsets.add(new StopOffset("55860", "NB260T", "1", 22));
+    stopOffsets.add(new StopOffset("99240", "NB215T", "1", 24));
+    stopOffsets.add(new StopOffset("99256", "NB153T", "1", 27));
+    stopOffsets.add(new StopOffset("99260", "NB117T", "1", 29));
+    stopOffsets.add(new StopOffset("621", "NB1093T", "1", 31));
+    stopOffsets.add(new StopOffset("532", "NB1075T", "1", 34));
+    stopOffsets.add(new StopOffset("565", "NB1053T", "1", 36));
+    stopOffsets.add(new StopOffset("1121", "NB1036T", "1", 38));
   }
   
   @Override
@@ -373,7 +371,7 @@ public class FeedServiceImpl implements FeedService {
       for (TripInfo trip : trips) {
         TripUpdate.Builder tu = TripUpdate.newBuilder();
         // Build the StopTimeUpdates
-        List<StopTimeUpdate> stopTimeUpdates = buildStopTimeUpdates(trip);
+        List<StopTimeUpdate> stopTimeUpdates = buildStopTimeUpdateList(trip);
         tu.addAllStopTimeUpdate(stopTimeUpdates);
 
         // Build the VehicleDescriptor
@@ -502,18 +500,53 @@ public class FeedServiceImpl implements FeedService {
     return tripStartTime;
   }
   
-  private List<StopTimeUpdate> buildStopTimeUpdates(TripInfo trip) {
+  private List<StopTimeUpdate> buildStopTimeUpdateList(TripInfo trip) {
     List<StopTimeUpdate> stopTimeUpdateList = new ArrayList<StopTimeUpdate>();
     StopUpdatesList stopUpdateData = trip.getStopUpdates();
     List<StopUpdate> stopUpdates = stopUpdateData.getUpdates();
     //boolean lastCompletedStopAdded = false;
     if (stopUpdates != null && stopUpdates.size() > 0) {
+      // If stopUpdates has any updates for Pine Street Stub, drop them
+      List<StopUpdate> modStopUpdates = new ArrayList<>();
+      for (int i=0; i<stopUpdates.size(); ++i) {
+        String stopId = stopUpdates.get(i).getStopId();
+        if (!stopId.equals(PINE_STREET_STUB)) {
+          modStopUpdates.add(stopUpdates.get(i));
+        }
+      }
+      stopUpdates = modStopUpdates;
+      
+      // For testing partial routes
+      /*
+      // Drop the last two StopTimeUpdates
+      _log.info("Full StopUpdates size: " + stopUpdates.size());
+      if (stopUpdates.size() >= 3) {
+        List<StopUpdate> testStopUpdates = new ArrayList<StopUpdate>();
+        for (int i=0; i<stopUpdates.size()-2; ++i) {
+          testStopUpdates.add(stopUpdates.get(i));
+        }
+        stopUpdates = testStopUpdates;
+        _log.info("Modified StopUpdates size: " + stopUpdates.size());
+      }
+      */
+      // End test block
+      
+      // For trips that serve less than the full route between Westlake
+      // and Sea-Tac, generate dummy entries for stops that would have already
+      // been seen if this trip were serving the full route.
+      /* */
+      
+      if (stopUpdates.size() < stopOffsets.size()/2) {
+        List<StopTimeUpdate> dummyStopTimeUpdates = 
+            buildDummyStopTimeUpdates(stopUpdates);
+        stopTimeUpdateList.addAll(dummyStopTimeUpdates);
+      }
+      /* */
       for (StopUpdate stopUpdate : stopUpdates) {
         if (stopUpdate.getStopId() == null
-            || stopUpdate.getStopId().isEmpty()
-            || stopUpdate.getStopId().equals(PINE_STREET_STUB)) {
+            || stopUpdate.getStopId().isEmpty()) {
           continue;
-        }          
+        }    
         ArrivalTime arrivalTimeDetails = stopUpdate.getArrivalTime();
         if (arrivalTimeDetails != null) {
           String arrivalTime = arrivalTimeDetails.getActual();
@@ -523,11 +556,15 @@ public class FeedServiceImpl implements FeedService {
           if (arrivalTime != null) {
             StopTimeUpdate stopTimeUpdate = 
                 buildStopTimeUpdate(stopUpdate.getStopId(),
-                    arrivalTime, getTripDirection(trip));
+                    arrivalTime, getTripDirection(trip), "");
             stopTimeUpdateList.add(stopTimeUpdate);
           }
         }
       }
+      // Check if stopUpdates need to be appended to the StopUpdateList
+      List<StopTimeUpdate> appendedStopTimeUpdates = 
+          buildAppendedStopTimeUpdates(stopUpdates);
+      stopTimeUpdateList.addAll(appendedStopTimeUpdates);
     }
     return stopTimeUpdateList;
   }
@@ -620,7 +657,8 @@ public class FeedServiceImpl implements FeedService {
     return linkTrips;
   }
 
-  private StopTimeUpdate buildStopTimeUpdate(String stopId, String arrivalTime, String direction) {
+  private StopTimeUpdate buildStopTimeUpdate(String stopId, String arrivalTime, 
+      String direction, String scheduleRelationship) {
     StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
     try {
       DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
@@ -633,6 +671,9 @@ public class FeedServiceImpl implements FeedService {
           stu.setStopId(stopId);
           stu.setArrival(ste);
           stu.setDeparture(ste);
+          if (scheduleRelationship.equals("SKIPPED")) {
+            stu.setScheduleRelationship(GtfsRealtime.TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED);
+          }
         }
       }
     } catch (Exception e) {
@@ -644,7 +685,7 @@ public class FeedServiceImpl implements FeedService {
   private String getTripForStop(String stopId, String direction, int scheduledTime) {
     int offset = 0;
     for (StopOffset stopOffset : stopOffsets) {
-      if (stopOffset.getStopId().equals(stopId)) {
+      if (stopOffset.getGtfsStopId().equals(stopId)) {
         offset = stopOffset.getOffset();
         break;
       }
@@ -659,6 +700,7 @@ public class FeedServiceImpl implements FeedService {
         }
         continue;
       }
+      //int startTimeInSecs = getTripStartTimeInSecs(tripEntry);
       if (tripStartTime < getTripStartTimeInSecs(tripEntry)) {
         if (lastTrip != null) {
           tripId = lastTrip.getId().getId();
@@ -688,6 +730,125 @@ public class FeedServiceImpl implements FeedService {
   	}
   	return startTime;
   }
+  
+  /*
+   * Generate dummy entries for any stops preceding the first real stop in the
+   * AVL feed of stop updates for this trip.
+   */
+  private List<StopTimeUpdate> buildDummyStopTimeUpdates(List<StopUpdate> stopUpdates) {
+    List<StopTimeUpdate> dummyStopTimeUpdateList = new ArrayList<StopTimeUpdate>();
+    
+    int numberOfStops = stopOffsets.size()/2;
+    String lastSouthboundStopId = stopOffsets.get(numberOfStops - 1).getLinkStopId();
+    String lastNorthboundStopId = stopOffsets.get(stopOffsets.size()-1).getLinkStopId();
+    String firstRealStopId = stopUpdates.get(0).getStopId();
+    String lastRealStopId = stopUpdates.get(stopUpdates.size()-1).getStopId();
+    
+    String dir = firstRealStopId.startsWith("SB") ? "0" : "1";
+    
+    int idx = dir.equals("0") ? 0 : stopOffsets.size()/2;
+    String dummyStopId = stopOffsets.get(idx).getLinkStopId();
+    
+    ArrivalTime arrivalTimeDetails = stopUpdates.get(0).getArrivalTime();
+    
+    while (!dummyStopId.equals(firstRealStopId)) {
+      String dummyArrivalTime = 
+          getAdjustedTime(stopUpdates.get(0), dummyStopId, dir);
+      
+      StopTimeUpdate stopTimeUpdate = 
+          buildStopTimeUpdate(dummyStopId, dummyArrivalTime, dir, "SKIPPED");
+      
+      // Set ScheduleRelationship
+      
+      dummyStopTimeUpdateList.add(stopTimeUpdate);
+      dummyStopId = stopOffsets.get(++idx).getLinkStopId();
+    }
+
+    
+    return dummyStopTimeUpdateList;
+  }
+  
+  private List<StopTimeUpdate> buildAppendedStopTimeUpdates(List<StopUpdate> stopUpdates) {
+    List<StopTimeUpdate> dummyStopTimeUpdateList = new ArrayList<StopTimeUpdate>();
+
+    int numberOfStops = stopOffsets.size()/2;
+    String lastSouthboundStopId = stopOffsets.get(numberOfStops - 1).getLinkStopId();
+    String lastNorthboundStopId = stopOffsets.get(stopOffsets.size()-1).getLinkStopId();
+    String firstRealStopId = stopUpdates.get(0).getStopId();
+    String lastRealStopId = stopUpdates.get(stopUpdates.size()-1).getStopId();
+    
+    String dir = firstRealStopId.startsWith("SB") ? "0" : "1";
+    int lastStopIdx = dir.equals("0") ? (stopOffsets.size()/2) - 1 : stopOffsets.size() - 1;
+    //String lastStopId = stopUpdates.get(lastStopIdx).getStopId();
+    String lastStopId = dir.equals("0") ? lastSouthboundStopId : lastNorthboundStopId;
+    int entriesToAdd = numberOfStops - stopUpdates.size();
+    
+    int idx = dir.equals("0") ? 0 : stopOffsets.size()/2;
+    idx += stopUpdates.size();
+    
+    
+    
+    for (int i=0; i<entriesToAdd; ++i) {
+      String dummyStopId = stopOffsets.get(idx++).getLinkStopId();
+      String dummyArrivalTime = 
+          getAdjustedTime(stopUpdates.get(stopUpdates.size()-1), dummyStopId, dir);
+      
+      StopTimeUpdate stopTimeUpdate = 
+          buildStopTimeUpdate(dummyStopId, dummyArrivalTime, dir, "SKIPPED");
+      
+      dummyStopTimeUpdateList.add(stopTimeUpdate);
+    }
+
+    
+    return dummyStopTimeUpdateList;
+  }
+  
+  private String getAdjustedTime(StopUpdate baseStopUpdate, String targetStopId, String dir) {
+    String adjustedTime = "";
+    ArrivalTime arrivalTimeDetails = baseStopUpdate.getArrivalTime();
+    if (arrivalTimeDetails != null) {
+      int numberOfStops = stopOffsets.size()/2;
+      int idx = dir.equals("0") ? 0 : stopOffsets.size()/2;
+      int baseOffset = -1;
+      int targetOffset = -1;
+      for (int i=0; i<numberOfStops; i++) {
+        StopOffset stopOffset = stopOffsets.get(idx+i);
+        if (baseStopUpdate.getStopId().equals(stopOffset.getLinkStopId())) {
+          baseOffset = stopOffset.getOffset();
+        }
+        if (targetStopId.equals(stopOffset.getLinkStopId())) {
+          targetOffset = stopOffset.getOffset();
+        }
+      }
+      if (baseOffset >= 0 && targetOffset >= 0) {
+        String arrivalTime = arrivalTimeDetails.getActual();
+        if (arrivalTime == null) {
+          arrivalTime = arrivalTimeDetails.getEstimated();
+        }
+        if (arrivalTime != null) {
+          try {
+            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
+            Date parsedDate = df.parse(arrivalTime);
+            int timeDelta = (targetOffset - baseOffset) * 60 * 1000;
+            Date adjustedDate = new Date(parsedDate.getTime() + timeDelta);
+            
+            // If the adjusted time is in the future or less than two minutes
+            // ago, reset it to five minutes ago so it won't generate a
+            // bogus prediction.
+            if ((System.currentTimeMillis() - 2 * 60 * 1000) 
+                < adjustedDate.getTime()) {
+              adjustedDate = new Date(System.currentTimeMillis() - 5 * 60 * 1000);
+            }
+              
+            adjustedTime = df.format(adjustedDate);
+          } catch (Exception e) {
+            _log.error("Exception parsing arrival time: " + arrivalTime);
+          }
+        }
+      }
+    }
+    return adjustedTime;
+  }
 
   private class TripComparator implements Comparator<TripEntry> {
 
@@ -716,15 +877,22 @@ public class FeedServiceImpl implements FeedService {
   }
   
   private class StopOffset {
-    private String stopId;
+    private String gtfsStopId;
+    private String linkStopId;
     private String direction;
     private int offset;
     
-    public String getStopId() {
-      return stopId;
+    public String getGtfsStopId() {
+      return gtfsStopId;
     }
-    public void setStopId(String stopId) {
-      this.stopId = stopId;
+    public void setGtfsStopId(String gtfsStopId) {
+      this.gtfsStopId = gtfsStopId;
+    }
+    public String getLinkStopId() {
+      return linkStopId;
+    }
+    public void setLinkStopId(String linkStopId) {
+      this.linkStopId = linkStopId;
     }
     public String getDirection() {
       return direction;
@@ -739,8 +907,9 @@ public class FeedServiceImpl implements FeedService {
       this.offset = offset;
     }
     
-    public StopOffset(String stopId, String direction, int offset) {
-      this.stopId = stopId;
+    public StopOffset(String gtfsStopId, String linkStopId, String direction, int offset) {
+      this.gtfsStopId = gtfsStopId;
+      this.linkStopId = linkStopId;
       this.direction = direction;
       this.offset = offset;
     }
