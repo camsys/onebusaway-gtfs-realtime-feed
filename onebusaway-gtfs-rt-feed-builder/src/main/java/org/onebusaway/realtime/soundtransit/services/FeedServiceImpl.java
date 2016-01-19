@@ -275,6 +275,12 @@ public class FeedServiceImpl implements FeedService {
     feedMessageBuilder.setHeader(header);
     if (trips != null) {
       for (TripInfo trip : trips) {
+        // If there are no stop time updates, don't generate a VehiclePosition
+        // for this trip.
+        int stopUpdateCt = trip.getStopUpdates().getUpdates().size();
+        if (stopUpdateCt < 2) {
+          continue;
+        }
         VehiclePosition.Builder vp = VehiclePosition.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
@@ -370,6 +376,12 @@ public class FeedServiceImpl implements FeedService {
     if (trips != null) {
       for (TripInfo trip : trips) {
         TripUpdate.Builder tu = TripUpdate.newBuilder();
+        // If there are no stop time updates, don't generate a TripUpdate
+        // for this trip.
+        int stopUpdateCt = trip.getStopUpdates().getUpdates().size();
+        if (stopUpdateCt < 2) {
+          continue;
+        }
         // Build the StopTimeUpdates
         List<StopTimeUpdate> stopTimeUpdates = buildStopTimeUpdateList(trip);
         tu.addAllStopTimeUpdate(stopTimeUpdates);
@@ -535,8 +547,12 @@ public class FeedServiceImpl implements FeedService {
       // and Sea-Tac, generate dummy entries for stops that would have already
       // been seen if this trip were serving the full route.
       /* */
-      
-      if (stopUpdates.size() < stopOffsets.size()/2) {
+      String firstSBStop = stopOffsets.get(0).getLinkStopId();
+      String firstNBStop = stopOffsets.get(stopOffsets.size()/2).getLinkStopId();
+      if (stopUpdates.size() < stopOffsets.size()/2
+          && !stopUpdates.get(0).getStopId().equals(firstSBStop)
+          && !stopUpdates.get(0).getStopId().equals(firstNBStop)) {
+        _log.info("Prepending pseudo stop time updates for trip " + trip.getTripId());
         List<StopTimeUpdate> dummyStopTimeUpdates = 
             buildDummyStopTimeUpdates(stopUpdates);
         stopTimeUpdateList.addAll(dummyStopTimeUpdates);
@@ -562,9 +578,18 @@ public class FeedServiceImpl implements FeedService {
         }
       }
       // Check if stopUpdates need to be appended to the StopUpdateList
-      List<StopTimeUpdate> appendedStopTimeUpdates = 
-          buildAppendedStopTimeUpdates(stopUpdates);
-      stopTimeUpdateList.addAll(appendedStopTimeUpdates);
+      String lastSBStop = stopOffsets.get(stopOffsets.size()/2-1).getLinkStopId();
+      String lastNBStop = stopOffsets.get(stopOffsets.size()-1).getLinkStopId();
+      _log.debug("Number of stop updates: " + stopUpdates.size());
+      _log.debug("Total number of stops: " + stopOffsets.size()/2);
+      if (stopUpdates.size() < stopOffsets.size()/2
+          && !stopUpdates.get(stopUpdates.size()-1).getStopId().equals(lastSBStop)
+          && !stopUpdates.get(stopUpdates.size()-1).getStopId().equals(lastNBStop)) {
+        _log.info("Appending stop time updates for trip " + trip.getTripId());
+        List<StopTimeUpdate> appendedStopTimeUpdates = 
+            buildAppendedStopTimeUpdates(stopUpdates);
+        stopTimeUpdateList.addAll(appendedStopTimeUpdates);
+      }
     }
     return stopTimeUpdateList;
   }
