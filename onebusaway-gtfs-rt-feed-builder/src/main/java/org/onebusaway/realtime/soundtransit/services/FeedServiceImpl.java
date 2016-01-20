@@ -554,7 +554,7 @@ public class FeedServiceImpl implements FeedService {
           && !stopUpdates.get(0).getStopId().equals(firstNBStop)) {
         _log.info("Prepending pseudo stop time updates for trip " + trip.getTripId());
         List<StopTimeUpdate> dummyStopTimeUpdates = 
-            buildDummyStopTimeUpdates(stopUpdates);
+            buildDummyStopTimeUpdates(stopUpdates, getTripDirection(trip));
         stopTimeUpdateList.addAll(dummyStopTimeUpdates);
       }
       /* */
@@ -760,7 +760,8 @@ public class FeedServiceImpl implements FeedService {
    * Generate dummy entries for any stops preceding the first real stop in the
    * AVL feed of stop updates for this trip.
    */
-  private List<StopTimeUpdate> buildDummyStopTimeUpdates(List<StopUpdate> stopUpdates) {
+  private List<StopTimeUpdate> buildDummyStopTimeUpdates(List<StopUpdate> stopUpdates,
+      String dir) {
     List<StopTimeUpdate> dummyStopTimeUpdateList = new ArrayList<StopTimeUpdate>();
     
     int numberOfStops = stopOffsets.size()/2;
@@ -768,9 +769,7 @@ public class FeedServiceImpl implements FeedService {
     String lastNorthboundStopId = stopOffsets.get(stopOffsets.size()-1).getLinkStopId();
     String firstRealStopId = stopUpdates.get(0).getStopId();
     String lastRealStopId = stopUpdates.get(stopUpdates.size()-1).getStopId();
-    
-    String dir = firstRealStopId.startsWith("SB") ? "0" : "1";
-    
+      
     int idx = dir.equals("0") ? 0 : stopOffsets.size()/2;
     String dummyStopId = stopOffsets.get(idx).getLinkStopId();
     
@@ -987,8 +986,6 @@ public class FeedServiceImpl implements FeedService {
     }
     
     if (direction.isEmpty()) {
-      // Check if train is at the airport
-      
       _log.info("No trip direction provided or inferred for trip " + trip.getTripId() + ". Defaulting to outbound.");
       direction = "0";     // Default to south, outbound
     }

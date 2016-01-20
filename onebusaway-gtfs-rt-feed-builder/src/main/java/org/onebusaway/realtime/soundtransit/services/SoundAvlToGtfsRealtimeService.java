@@ -112,7 +112,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 
     _delayExecutor = Executors.newSingleThreadScheduledExecutor();
     _delayExecutor.scheduleAtFixedRate(new DelayThread(), _refreshInterval,
-        _refreshInterval / 4, TimeUnit.SECONDS);
+        _refreshInterval / 2, TimeUnit.SECONDS);
   }
 
   @PreDestroy
@@ -166,25 +166,15 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
         _log.info("refreshing vehicles");
         writeGtfsRealtimeOutput();
         _lastUpdateTime = System.currentTimeMillis();
+        _log.info("GTFS-rt feed updated");
       } catch (Exception ex) {
         _log.error("Failed to refresh TransitData: " + ex.getMessage());
-        _log.error(ex.toString(), ex);
-        _log.error("Continuing processing.");
       }
     }
   }
   private class DelayThread implements Runnable {
     public void run() {
       long updateTime = (System.currentTimeMillis() - _lastUpdateTime) / 1000;
-      //if (hangTime > (_refreshInterval * 6)) {
-        // if we've reached here, the connection to the database has hung
-        // we assume a service-based configuration and simply exit
-        // TODO adjust network/driver timeouts instead!
-        //_log.error("Connection hung with delay of " + hangTime + ".  Exiting!");
-        //System.exit(1);  Commented out for now to prevent shutting down while AVL feed is refreshing.
-      //} else {
-      //  _log.info("hangTime:" + hangTime);
-      //}
       _log.info("seconds since last update:" + updateTime);
     }
   }
@@ -197,10 +187,10 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
         "text/html,application/xhtml+xml,application/json;q=0.9,application/xml;q=0.9,*/*;q=0.8");
     Map<String, List<String>> properties = avlConnection.getRequestProperties();
     if (properties.size() == 0) {
-      _log.info("no request properties present.");
+      _log.debug("no request properties present.");
     }
     for (String propertyKey : properties.keySet()) {
-      _log.info("property key: " + propertyKey);
+      _log.debug("property key: " + propertyKey);
     }
     //_log.info("Accept header: " + avlConnection.getHeaderField("Accept"));
     //_log.info("Accept property: " + avlConnection.getRequestProperty("Accept"));
