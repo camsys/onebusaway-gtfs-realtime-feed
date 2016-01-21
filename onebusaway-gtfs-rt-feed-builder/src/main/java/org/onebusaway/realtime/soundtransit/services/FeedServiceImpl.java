@@ -305,7 +305,21 @@ public class FeedServiceImpl implements FeedService {
           _log.info("Vehicle latitude/longitude for vehicle " + vehicleId
               + " could not be parsed");
         }
-        vp.setTimestamp(System.currentTimeMillis()/1000);
+        // Set timestamp to trip LastUpdatedDate
+        long timestamp = 0L;
+        String lastUpdatedDate = trip.getLastUpdatedDate();
+        if (lastUpdatedDate != null) {
+          try {
+            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
+            Date parsedDate = df.parse(lastUpdatedDate);
+            timestamp = parsedDate.getTime() / 1000;
+          } catch (Exception e) {
+            _log.debug("Exception parsing LastUpdatedDate time: " + lastUpdatedDate);
+          }
+        }
+        timestamp = timestamp != 0L ? timestamp : System.currentTimeMillis()/1000;
+        vp.setTimestamp(timestamp);
+
         StopUpdate nextStop = findNextStopOnTrip(trip.getStopUpdates());
         if (nextStop == null) {
           _log.info("Cannot determine next stop id for trip " + trip.getTripId());
@@ -400,7 +414,21 @@ public class FeedServiceImpl implements FeedService {
         // Build the TripDescriptor
         TripDescriptor td = buildTripDescriptor(trip);
         tu.setTrip(td);
-        tu.setTimestamp(System.currentTimeMillis()/1000);
+
+        // Set timestamp to trip LastUpdatedDate
+        long timestamp = 0L;
+        String lastUpdatedDate = trip.getLastUpdatedDate();
+        if (lastUpdatedDate != null) {
+          try {
+            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
+            Date parsedDate = df.parse(lastUpdatedDate);
+            timestamp = parsedDate.getTime() / 1000;
+          } catch (Exception e) {
+            _log.debug("Exception parsing LastUpdatedDate time: " + lastUpdatedDate);
+          }
+        }
+        timestamp = timestamp != 0L ? timestamp : System.currentTimeMillis()/1000;
+        tu.setTimestamp(timestamp);
         FeedEntity.Builder entity = FeedEntity.newBuilder();
         // Use VehicleId for entity Id since that is unique per trip
         entity.setId(vehicleId);
