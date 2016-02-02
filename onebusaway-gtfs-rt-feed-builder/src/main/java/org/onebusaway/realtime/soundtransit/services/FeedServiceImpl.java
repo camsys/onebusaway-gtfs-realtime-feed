@@ -29,19 +29,24 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig;
+import org.onebusaway.gtfs.model.calendar.LocalizedServiceId;
 import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.realtime.soundtransit.model.TripInfoList;
+import org.onebusaway.transit_data_federation.services.ExtendedCalendarService;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.BlockEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.FrequencyEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.ServiceIdActivation;
 import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 import org.slf4j.Logger;
@@ -74,6 +79,7 @@ public class FeedServiceImpl implements FeedService {
   private static String SEA_TAC = "SEA_PLAT";
   private static String PINE_STREET_STUB = "PNSS_PLAT"; // Not really a stop.
   private TransitGraphDao _transitGraphDao;
+  private ExtendedCalendarService _calendarService;
   private Map<String, String> stopMapping = null;
   //private Map<String, String> tripMapping = null;
   private String _linkAgencyId;
@@ -101,6 +107,11 @@ public class FeedServiceImpl implements FeedService {
     _transitGraphDao = transitGraphDao;
   }
 
+  @Autowired
+  public void set_calendarService(ExtendedCalendarService _calendarService) {
+    this._calendarService = _calendarService;
+  }
+
   public FeedMessage getCurrentVehiclePositions() {
     return _currentVehiclePositions;
   }
@@ -117,8 +128,8 @@ public class FeedServiceImpl implements FeedService {
     this._currentTripUpdates = currentTripUpdates;
   }
 
-  public void set_tripEntries(List<TripEntry> _tripEntries) {
-    this._tripEntries = _tripEntries;
+  public void setTripEntries(List<TripEntry> tripEntries) {
+    this._tripEntries = tripEntries;
   }
 
   public Map<String, String> getStopMapping() {
@@ -159,6 +170,9 @@ public class FeedServiceImpl implements FeedService {
   public void init() {
 	  if (_tripEntries == null) {  // Should be null unless unit test injects a value.
 	    _tripEntries = getLinkTrips();
+	    for (TripEntry trip : _tripEntries) {
+	      _log.info("Trip id: " + trip.getId().getId());
+	    }
 	  }
 	  // Set up list of offset for stops.  This is the time in minutes from the beginning of the trip
 	  // For now hardcode the tables to help localize debugging.
@@ -215,36 +229,46 @@ public class FeedServiceImpl implements FeedService {
     } catch (IOException e) {
       _log.error("IOException trying to parse feed data.");
       parseFailed = true;
+    } catch (Exception e) {
+      _log.error("Exception trying to parse feed data: " + e.getMessage());
+      parseFailed = true;
     }
     if (parseFailed) {
       return null;
     }
-    // The AVL feed occasionally has dates from 1899.  That apparently is some
-    // sort of default value for their system.
+    // The AVL feed occasionally has dates from 1899.  That is because MySQL
+    // will report a null date as 12-30-1899.
     // Convert any "1899" dates in ArrivalTime to today
     TripInfoList tripInfoList = linkAVLData.getTrips();
-    List<TripInfo> trips = tripInfoList.getTrips();
-    for (TripInfo trip : trips) {
-      StopUpdatesList stopUpdatesList = trip.getStopUpdates();
-      List<StopUpdate> stopUpdates = stopUpdatesList.getUpdates();
-      if (stopUpdates != null && stopUpdates.size() > 0) {
-        for (StopUpdate stopTimeUpdate : stopUpdates) {
-          ArrivalTime arrivalTime = stopTimeUpdate.getArrivalTime();
-          if (arrivalTime != null) {
-            String actual = arrivalTime.getActual();
-            String estimated = arrivalTime.getEstimated();
-            String scheduled = arrivalTime.getScheduled();
-            if (actual != null && actual.startsWith("1899")) {
-              actual = convert1899Date(actual);
-              arrivalTime.setActual(actual);
-            }
-            if (estimated != null && estimated.startsWith("1899")) {
-              estimated = convert1899Date(estimated);
-              arrivalTime.setEstimated(estimated);
-            }
-            if (scheduled != null && scheduled.startsWith("1899")) {
-              scheduled = convert1899Date(scheduled);
-              arrivalTime.setScheduled(scheduled);
+    if (tripInfoList != null) {
+      List<TripInfo> trips = tripInfoList.getTrips();
+      if (trips != null) {
+        for (TripInfo trip : trips) {
+          StopUpdatesList stopUpdatesList = trip.getStopUpdates();
+          if (stopUpdatesList == null) {
+            continue;
+          }
+          List<StopUpdate> stopUpdates = stopUpdatesList.getUpdates();
+          if (stopUpdates != null && stopUpdates.size() > 0) {
+            for (StopUpdate stopTimeUpdate : stopUpdates) {
+              ArrivalTime arrivalTime = stopTimeUpdate.getArrivalTime();
+              if (arrivalTime != null) {
+                String actual = arrivalTime.getActual();
+                String estimated = arrivalTime.getEstimated();
+                String scheduled = arrivalTime.getScheduled();
+                if (actual != null && actual.startsWith("1899")) {
+                  actual = convert1899Date(actual);
+                  arrivalTime.setActual(actual);
+                }
+                if (estimated != null && estimated.startsWith("1899")) {
+                  estimated = convert1899Date(estimated);
+                  arrivalTime.setEstimated(estimated);
+                }
+                if (scheduled != null && scheduled.startsWith("1899")) {
+                  scheduled = convert1899Date(scheduled);
+                  arrivalTime.setScheduled(scheduled);
+                }
+              }
             }
           }
         }
@@ -263,24 +287,39 @@ public class FeedServiceImpl implements FeedService {
   }
 
   public FeedMessage buildVPMessage(LinkAVLData linkAVLData) {
+    _log.debug("*****Starting buildVPMessage");
     int vehiclePositionEntityCount = 0;
     FeedMessage vehiclePositionsFM = null;
-    TripInfoList tripInfoList = linkAVLData.getTrips();
-    List<TripInfo> trips = tripInfoList.getTrips();
     FeedMessage.Builder feedMessageBuilder = FeedMessage.newBuilder();
     FeedHeader.Builder header = FeedHeader.newBuilder();
     header.setTimestamp(System.currentTimeMillis()/1000);
     header.setIncrementality(Incrementality.FULL_DATASET);
     header.setGtfsRealtimeVersion(GtfsRealtimeConstants.VERSION);
     feedMessageBuilder.setHeader(header);
+    TripInfoList tripInfoList = linkAVLData.getTrips();
+    List<TripInfo> trips = tripInfoList != null ? tripInfoList.getTrips() : null;
     if (trips != null) {
+      _log.debug("trips.size(): " + trips.size());
       for (TripInfo trip : trips) {
+        _log.debug("trip id: " + trip.getTripId());
+        //if (trip.getTripId().contains("Un")) {
+        //  _log.debug("drop trip " + trip.getTripId());
+        //  continue;
+        //}
         // If there are no stop time updates, don't generate a VehiclePosition
         // for this trip.
-        int stopUpdateCt = trip.getStopUpdates().getUpdates().size();
-        if (stopUpdateCt < 2) {
+        //_log.info("Checking for null for trip " + trip.getTripId());
+        StopUpdatesList stopUpdateList = trip.getStopUpdates();
+        //if (stopUpdateList == null) {
+        //  continue;
+        //}
+        List<StopUpdate> updateList = stopUpdateList != null ? 
+            stopUpdateList.getUpdates() : null;
+        if (updateList == null || updateList.size() < 2) {
           continue;
         }
+        
+        //_log.info("Finished checking for null");
         VehiclePosition.Builder vp = VehiclePosition.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
@@ -349,8 +388,8 @@ public class FeedServiceImpl implements FeedService {
 
         // Loop through StopUpdates to determine the trip start time and date.
         // Initially, set nextStopTime to an arbitrarily high value.
-        Calendar cal = Calendar.getInstance();
-        cal.set(2099, 12, 31);
+        //Calendar cal = Calendar.getInstance();
+        //cal.set(2099, 12, 31);
         TripDescriptor td = buildTripDescriptor(trip);
         vp.setTrip(td);
 
@@ -360,8 +399,7 @@ public class FeedServiceImpl implements FeedService {
         feedMessageBuilder.addEntity(entity);
         ++vehiclePositionEntityCount;
       }
-    } else {
-      // TODO: decide what to do if no data is found.
+      _log.debug("trip loop finished");
     }
     vehiclePositionsFM = feedMessageBuilder.build();
     if (vehiclePositionsFM != null) {
@@ -370,32 +408,48 @@ public class FeedServiceImpl implements FeedService {
       vehiclePositionsFM = FeedMessage.getDefaultInstance();
     }
     _log.info("vehicle position updates: " + vehiclePositionEntityCount);
+    _log.debug("*****finishing buildVPMessage");
     return vehiclePositionsFM;
   }
 
   public FeedMessage buildTUMessage(LinkAVLData linkAVLData) {
+    _log.debug("*****starting buildTUMessage");
+    int tripUpdateEntityCount = 0;
     FeedMessage tripUpdatesFM = null;
-    TripInfoList tripsData = linkAVLData.getTrips();
-    List<TripInfo> trips = null;
-    if (tripsData != null) {
-      trips = tripsData.getTrips();
-    }
+    TripInfoList tripInfoList = linkAVLData.getTrips();
     FeedMessage.Builder feedMessageBuilder = FeedMessage.newBuilder();
     FeedHeader.Builder header = FeedHeader.newBuilder();
     header.setTimestamp(System.currentTimeMillis()/1000);
     header.setIncrementality(Incrementality.FULL_DATASET);
     header.setGtfsRealtimeVersion(GtfsRealtimeConstants.VERSION);
     feedMessageBuilder.setHeader(header);
+    List<TripInfo> trips = tripInfoList != null ? tripInfoList.getTrips() : null;
     _log.debug("Processing " + trips.size() + " trips");
     if (trips != null) {
+      _log.debug("Starting trip loop");
       for (TripInfo trip : trips) {
-        TripUpdate.Builder tu = TripUpdate.newBuilder();
+        _log.debug("Building TU for trip " + trip.getTripId());
+        // For now, skip unscheduled trips.  At least some of them are causing
+        // the feed to not refresh at all, and we can't afford to impact 
+        // testing right now.
+        //if (trip.getTripId().contains("Un")) {
+        //  _log.info("Dropping unscheduled trip " + trip.getTripId());
+        //  continue;
+        //}
         // If there are no stop time updates, don't generate a TripUpdate
         // for this trip.
-        int stopUpdateCt = trip.getStopUpdates().getUpdates().size();
-        if (stopUpdateCt < 2) {
+        //_log.info("Checking for null for trip " + trip.getTripId());
+        StopUpdatesList stopUpdateList = trip.getStopUpdates();
+        //if (stopUpdateList == null) {
+        //  continue;
+        //}
+        List<StopUpdate> updateList = stopUpdateList != null ? 
+            stopUpdateList.getUpdates() : null;
+        if (updateList == null || updateList.size() < 2) {
           continue;
         }
+        //_log.info("Finished checking for null");
+        TripUpdate.Builder tu = TripUpdate.newBuilder();
         // Build the StopTimeUpdates
         List<StopTimeUpdate> stopTimeUpdates = buildStopTimeUpdateList(trip);
         tu.addAllStopTimeUpdate(stopTimeUpdates);
@@ -434,11 +488,14 @@ public class FeedServiceImpl implements FeedService {
         entity.setId(vehicleId);
         entity.setTripUpdate(tu);
         feedMessageBuilder.addEntity(entity);
+        ++tripUpdateEntityCount;
       }
+      _log.debug("Ending trip loop");
     } else {
       // TODO: decide what to do if no data is found.
       // Map<String, String> feedResult = (Map<String, String>)
       // parsedAvlUpdates.get("Fault");
+      _log.info("buildTUMessage(): no trip data found");
     }
     tripUpdatesFM = feedMessageBuilder.build();
     if (tripUpdatesFM != null) {
@@ -446,6 +503,8 @@ public class FeedServiceImpl implements FeedService {
     } else {
       tripUpdatesFM = FeedMessage.getDefaultInstance();
     }
+    _log.info("trip updates: " + tripUpdateEntityCount);
+    _log.debug("*****Ending buildTUMessage");
     return tripUpdatesFM;
   }
 
@@ -559,14 +618,14 @@ public class FeedServiceImpl implements FeedService {
       // For testing partial routes
       /*
       // Drop the last two StopTimeUpdates
-      _log.info("Full StopUpdates size: " + stopUpdates.size());
+      _log.debug("Full StopUpdates size: " + stopUpdates.size());
       if (stopUpdates.size() >= 3) {
         List<StopUpdate> testStopUpdates = new ArrayList<StopUpdate>();
         for (int i=0; i<stopUpdates.size()-2; ++i) {
           testStopUpdates.add(stopUpdates.get(i));
         }
         stopUpdates = testStopUpdates;
-        _log.info("Modified StopUpdates size: " + stopUpdates.size());
+        _log.debug("Modified StopUpdates size: " + stopUpdates.size());
       }
       */
       // End test block
@@ -580,9 +639,9 @@ public class FeedServiceImpl implements FeedService {
       if (stopUpdates.size() < stopOffsets.size()/2
           && !stopUpdates.get(0).getStopId().equals(firstSBStop)
           && !stopUpdates.get(0).getStopId().equals(firstNBStop)) {
-        _log.info("Prepending pseudo stop time updates for trip " + trip.getTripId());
+        //_log.info("Prepending pseudo stop time updates for trip " + trip.getTripId());
         List<StopTimeUpdate> dummyStopTimeUpdates = 
-            buildDummyStopTimeUpdates(stopUpdates, getTripDirection(trip));
+            buildPseudoStopTimeUpdates(stopUpdates, getTripDirection(trip));
         stopTimeUpdateList.addAll(dummyStopTimeUpdates);
       }
       /* */
@@ -623,11 +682,17 @@ public class FeedServiceImpl implements FeedService {
   }
 
   private TripDescriptor buildTripDescriptor(TripInfo trip) {
+    //_log.debug("buildTripDescriptor: " + trip.getTripId());
     TripDescriptor.Builder td = TripDescriptor.newBuilder();
+    //if (trip.getTripId().contains("Un")) {
+    //  _log.debug("Skipping buildTripDescriptor");
+    //  return td.build();
+    //}
     String stopId = "";
     int scheduledTime = 0;
-    StopUpdatesList stopTimeUpdateData = trip.getStopUpdates();
-    List<StopUpdate> stopTimeUpdates = stopTimeUpdateData.getUpdates();
+    StopUpdatesList stopTimeUpdateData = trip != null ? trip.getStopUpdates() : null;
+    List<StopUpdate> stopTimeUpdates = stopTimeUpdateData != null 
+        ? stopTimeUpdateData.getUpdates() : null;
     if (stopTimeUpdates != null && stopTimeUpdates.size() > 0) {
       for (StopUpdate stopTimeUpdate : stopTimeUpdates) {
         if (stopTimeUpdate.getStopId() == null
@@ -659,21 +724,24 @@ public class FeedServiceImpl implements FeedService {
         break;
       }
     }
+    // stopId should now be the last stop on the line
     _log.debug("Stop id before mapping: " + stopId);
     String mappedStopId = null;
-    if (stopId != null) {
+    if (stopId != null && !stopId.isEmpty() && trip != null) {
       String direction = getTripDirection(trip);
       mappedStopId = getGTFSStop(stopId, direction);
     }
-
-    if (mappedStopId == null || mappedStopId.isEmpty()) {
-      _log.info("mappedStopId is null for trip " + trip.getTripId() + " and stop " + trip.getLastStopName() 
+    if (mappedStopId == null || mappedStopId.isEmpty() && trip != null) {
+      _log.debug("mappedStopId is null for trip " + trip.getTripId() + " and stop " + trip.getLastStopName() 
           + ", stopid is " + stopId);
+    } else {
+      _log.debug("GTFS stop id: " + mappedStopId);
     }
     String direction = getTripDirection(trip);
+    _log.debug("Get GTFS trip id for AVL trip " + trip.getTripId());
     String tripId = getTripForStop(mappedStopId, direction, scheduledTime);
     if (tripId == null) {
-      _log.info("trip id is null");
+      _log.debug("trip id is null");
       tripId = "";
     }
     // Set trip start time and date from tripStartTime
@@ -685,12 +753,14 @@ public class FeedServiceImpl implements FeedService {
       String startDate = df.format(tripStartTime);
       td.setStartTime(startTime);
       td.setStartDate(startDate);
+      _log.debug("trip start time: " + startDate);
     } else {
-      _log.info("Null tripStartTime for trip " + tripId);
+      _log.debug("Null tripStartTime for trip " + tripId);
     }
     td.setTripId(tripId);
     td.setScheduleRelationship(ScheduleRelationship.SCHEDULED);
     td.setRouteId(_linkRouteId);
+    _log.debug("Ending buildTripDescriptor");
     return td.build();
   }
   
@@ -701,7 +771,39 @@ public class FeedServiceImpl implements FeedService {
     for (TripEntry trip : allTrips) {
       //if (trip.getRoute().getId().getId().equals(routeId) && trip.getBlock().getId().getId().equals(trip.getId().getId())) {
       if (trip.getRoute().getId().getId().equals(routeId)) {
-        linkTrips.add(trip);
+        // Check if this trip has a service id that is valid for today.
+        //ServiceDate serviceDate = null;
+        //BlockEntry block = trip.getBlock();
+        //BlockInstance instance = _blockCalendarService.getBlockInstance(block.getId(),
+        //    serviceDate.getAsDate().getTime());
+        BlockEntry blockEntry = trip.getBlock();
+        _log.info("***Block id***: " + blockEntry.toString());
+        List<BlockConfigurationEntry> bceList = blockEntry.getConfigurations();
+        _log.info("bceList size is " + bceList.size());
+        for (BlockConfigurationEntry bce : bceList) {
+          _log.info(bce.toString());
+        }
+        _log.info("*****");
+        LocalizedServiceId serviceId = trip.getServiceId();
+        _log.info("Service id: " + serviceId.toString());
+        Set<Date> activeDates = _calendarService.getDatesForServiceIds(new ServiceIdActivation(serviceId));
+        //for (Date date : activeDates) {
+        //  _log.info(date.toString());
+        //}
+        Calendar today = Calendar.getInstance();
+        today.set(Calendar.HOUR_OF_DAY, 0);
+        today.set(Calendar.MINUTE, 0);
+        today.set(Calendar.SECOND, 0);
+        today.set(Calendar.MILLISECOND, 0);
+        //Date todaysDate = new Date(today.getTimeInMillis());
+        boolean isActiveToday = 
+            _calendarService.areServiceIdsActiveOnServiceDate(
+                new ServiceIdActivation(serviceId), today.getTime());
+        _log.info("isActiveToday: " + isActiveToday);
+        if (isActiveToday) {
+          _log.info("Adding trip " + trip.toString());
+          linkTrips.add(trip);
+        }
       }
     }
     TripComparator tripComparator = new TripComparator();
@@ -730,7 +832,7 @@ public class FeedServiceImpl implements FeedService {
         }
       }
     } catch (Exception e) {
-    _log.error("Exception parsing Estimated time: " + arrivalTime);
+    _log.error("Exception parsing Estimated time " + arrivalTime + " for stop " + stopId);
     }
     return stu.build();
   }
@@ -746,25 +848,29 @@ public class FeedServiceImpl implements FeedService {
     int tripStartTime = scheduledTime - (offset * 60);
     String tripId = "";
     TripEntry lastTrip = null;
-    for (TripEntry tripEntry : _tripEntries) {
-      if (!direction.equals(tripEntry.getDirectionId())) {
+    // Get trips for today by checking if their service ids are active today
+    
+    
+    for (TripEntry gtfsTripEntry : _tripEntries) {
+      _log.debug("GTFS trip id: " + gtfsTripEntry.getId().getId());
+      if (!direction.equals(gtfsTripEntry.getDirectionId())) {
         if (lastTrip != null) {
           tripId = lastTrip.getId().getId();
         }
         continue;
       }
       //int startTimeInSecs = getTripStartTimeInSecs(tripEntry);
-      if (tripStartTime < getTripStartTimeInSecs(tripEntry)) {
+      if (tripStartTime < getTripStartTimeInSecs(gtfsTripEntry)) {
         if (lastTrip != null) {
           tripId = lastTrip.getId().getId();
         } else {  // Earlier than the first entry, so just use the first stop.
-          tripId = tripEntry.getId().getId();
+          tripId = gtfsTripEntry.getId().getId();
         }
         break;
       }
-      lastTrip = tripEntry;
+      lastTrip = gtfsTripEntry;
     }
-    if (tripId == null) {  // Assign it to the last stop
+    if (tripId == null) {  // Assign it to the last trip
       tripId = _tripEntries.get(_tripEntries.size()-1).getId().getId();
     }
     
@@ -779,6 +885,9 @@ public class FeedServiceImpl implements FeedService {
   		List<FrequencyEntry> frequencies = blocks.get(0).getFrequencies();
   		if (frequencies.size() > 0) {
   			startTime = frequencies.get(0).getStartTime();
+  			for (FrequencyEntry frequency : frequencies) {
+  			  _log.debug("Frequency start time: " + frequency.getStartTime());
+  			}
   		}
   	}
   	return startTime;
@@ -788,7 +897,7 @@ public class FeedServiceImpl implements FeedService {
    * Generate dummy entries for any stops preceding the first real stop in the
    * AVL feed of stop updates for this trip.
    */
-  private List<StopTimeUpdate> buildDummyStopTimeUpdates(List<StopUpdate> stopUpdates,
+  private List<StopTimeUpdate> buildPseudoStopTimeUpdates(List<StopUpdate> stopUpdates,
       String dir) {
     List<StopTimeUpdate> dummyStopTimeUpdateList = new ArrayList<StopTimeUpdate>();
     
@@ -797,23 +906,44 @@ public class FeedServiceImpl implements FeedService {
     String lastNorthboundStopId = stopOffsets.get(stopOffsets.size()-1).getLinkStopId();
     String firstRealStopId = stopUpdates.get(0).getStopId();
     String lastRealStopId = stopUpdates.get(stopUpdates.size()-1).getStopId();
-      
+    int firstRealStopIdx = 0;
+    
+    // Make sure the first real stop is headed in the right direction,
+    // since a train may come onto the line at a NB platform, for instance,
+    // and immediately switch to the SB platform and continue SB for the
+    // rest of the trip.
+    String dirStr = "NB";
+    if (dir.equals("0")) {
+      dirStr = "SB";
+    }
+    if (!firstRealStopId.startsWith(dirStr)) {
+      for (int i=0; i < stopUpdates.size(); i++) {
+        if (stopUpdates.get(i).getStopId().startsWith(dirStr)) {
+          firstRealStopId = stopUpdates.get(i).getStopId();
+          firstRealStopIdx = i;
+          _log.debug("Using firstRealStop of " + firstRealStopId);
+          break;
+        }
+      }
+    }
+    
     int idx = dir.equals("0") ? 0 : stopOffsets.size()/2;
-    String dummyStopId = stopOffsets.get(idx).getLinkStopId();
+    // Set pseudoStopId to first stop on the route.
+    String pseudoStopId = stopOffsets.get(idx).getLinkStopId();
     
-    ArrivalTime arrivalTimeDetails = stopUpdates.get(0).getArrivalTime();
+    ArrivalTime arrivalTimeDetails = stopUpdates.get(firstRealStopIdx).getArrivalTime();
     
-    while (!dummyStopId.equals(firstRealStopId)) {
+    // Create pseudo entries from the beginning of the line to the first stop
+    // in the stop updates.
+    while (!pseudoStopId.equals(firstRealStopId)) {
       String dummyArrivalTime = 
-          getAdjustedTime(stopUpdates.get(0), dummyStopId, dir);
+          getAdjustedTime(firstRealStopId, arrivalTimeDetails, pseudoStopId, dir);
       
       StopTimeUpdate stopTimeUpdate = 
-          buildStopTimeUpdate(dummyStopId, dummyArrivalTime, dir, "SKIPPED");
-      
-      // Set ScheduleRelationship
+          buildStopTimeUpdate(pseudoStopId, dummyArrivalTime, dir, "SKIPPED");
       
       dummyStopTimeUpdateList.add(stopTimeUpdate);
-      dummyStopId = stopOffsets.get(++idx).getLinkStopId();
+      pseudoStopId = stopOffsets.get(++idx).getLinkStopId();
     }
 
     
@@ -827,7 +957,6 @@ public class FeedServiceImpl implements FeedService {
     String lastSouthboundStopId = stopOffsets.get(numberOfStops - 1).getLinkStopId();
     String lastNorthboundStopId = stopOffsets.get(stopOffsets.size()-1).getLinkStopId();
     String firstRealStopId = stopUpdates.get(0).getStopId();
-    String lastRealStopId = stopUpdates.get(stopUpdates.size()-1).getStopId();
     
     String dir = firstRealStopId.startsWith("SB") ? "0" : "1";
     int lastStopIdx = dir.equals("0") ? (stopOffsets.size()/2) - 1 : stopOffsets.size() - 1;
@@ -839,11 +968,16 @@ public class FeedServiceImpl implements FeedService {
     idx += stopUpdates.size();
     
     
-    
+    // Create pseudo entries from the last real stop to the end of the line
+    //ArrivalTime arrivalTimeDetails = stopUpdates.get(firstRealStopIdx).getArrivalTime();
+    ArrivalTime arrivalTimeDetails = stopUpdates.get(stopUpdates.size()-1).getArrivalTime();
+    String lastRealStopId = stopUpdates.get(stopUpdates.size()-1).getStopId();
     for (int i=0; i<entriesToAdd; ++i) {
       String dummyStopId = stopOffsets.get(idx++).getLinkStopId();
       String dummyArrivalTime = 
-          getAdjustedTime(stopUpdates.get(stopUpdates.size()-1), dummyStopId, dir);
+          getAdjustedTime(lastStopId, arrivalTimeDetails, dummyStopId, dir);
+      //String dummyArrivalTime = 
+      //   getAdjustedTime(stopUpdates.get(stopUpdates.size()-1), dummyStopId, dir);
       
       StopTimeUpdate stopTimeUpdate = 
           buildStopTimeUpdate(dummyStopId, dummyArrivalTime, dir, "SKIPPED");
@@ -855,17 +989,23 @@ public class FeedServiceImpl implements FeedService {
     return dummyStopTimeUpdateList;
   }
   
-  private String getAdjustedTime(StopUpdate baseStopUpdate, String targetStopId, String dir) {
+  /*
+   * This method is used when creating pseudo entries for a trip covering only
+   * part of the route to prevent OBA from creating its own entries for 
+   * those stops.
+   */
+  private String getAdjustedTime(String baseStopId, 
+      ArrivalTime arrivalTimeDetails, String targetStopId, String dir) {
     String adjustedTime = "";
-    ArrivalTime arrivalTimeDetails = baseStopUpdate.getArrivalTime();
     if (arrivalTimeDetails != null) {
       int numberOfStops = stopOffsets.size()/2;
       int idx = dir.equals("0") ? 0 : stopOffsets.size()/2;
       int baseOffset = -1;
       int targetOffset = -1;
+      // Run through the list of StopOffsets for this direction
       for (int i=0; i<numberOfStops; i++) {
         StopOffset stopOffset = stopOffsets.get(idx+i);
-        if (baseStopUpdate.getStopId().equals(stopOffset.getLinkStopId())) {
+        if (baseStopId.equals(stopOffset.getLinkStopId())) {
           baseOffset = stopOffset.getOffset();
         }
         if (targetStopId.equals(stopOffset.getLinkStopId())) {

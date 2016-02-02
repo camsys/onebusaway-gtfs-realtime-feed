@@ -76,9 +76,9 @@ public class FeedServiceBuildMessageTest {
     _feedService = new FeedServiceImpl();
     _feedService.setTransitGraphDao(_transitGraphDao);
     _feedService.setLinkRouteId("100479");
-    _feedService.set_tripEntries(new ArrayList<TripEntry>());
+    _feedService.setTripEntries(new ArrayList<TripEntry>());
     _feedService.init();
-    _feedService.set_tripEntries(buildTripsForFrequencyTrips());
+    _feedService.setTripEntries(buildTripsForFrequencyTrips());
 
     parsedLinkAVLData_1 = parseAVLDataFromFile(LINK_AVL_DATA_1);
     vehiclePositionsFM_1 = _feedService.buildVPMessage(parsedLinkAVLData_1);

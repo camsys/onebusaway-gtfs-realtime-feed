@@ -23,7 +23,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
@@ -137,12 +136,13 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 
   void writeGtfsRealtimeOutput(String dataFromAvl) {
     LinkAVLData linkAVLData = _feedService.parseAVLFeed(dataFromAvl);
-    vehiclePositionsFM = _feedService.buildVPMessage(linkAVLData);
-    tripUpdatesFM = _feedService.buildTUMessage(linkAVLData);
+    if (linkAVLData != null) {
+      vehiclePositionsFM = _feedService.buildVPMessage(linkAVLData);
+      tripUpdatesFM = _feedService.buildTUMessage(linkAVLData);
+    }
   }
 
   public void writeGtfsRealtimeOutput() throws Exception {
-    _log.debug("About to call readAvlUpdatesFromUrl");
     String dataFromAvl = readAvlUpdatesFromUrl(_linkAvlFeedUrl);
     _log.debug("AVL: " + dataFromAvl);
     writeGtfsRealtimeOutput(dataFromAvl);
@@ -185,32 +185,17 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     avlConnection.setRequestProperty(
         "Accept",
         "text/html,application/xhtml+xml,application/json;q=0.9,application/xml;q=0.9,*/*;q=0.8");
-    Map<String, List<String>> properties = avlConnection.getRequestProperties();
-    if (properties.size() == 0) {
-      _log.debug("no request properties present.");
-    }
-    for (String propertyKey : properties.keySet()) {
-      _log.debug("property key: " + propertyKey);
-    }
-    //_log.info("Accept header: " + avlConnection.getHeaderField("Accept"));
-    //_log.info("Accept property: " + avlConnection.getRequestProperty("Accept"));
-    //_log.info("content type: " + avlConnection.getContentType());
-    //_log.info("accept header: " + avlConnection.getHeaderField("Accept"));
     InputStream in = avlConnection.getInputStream();
-    try {
-      BufferedReader br = new BufferedReader(new InputStreamReader(in));
+    try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
+      //BufferedReader br = new BufferedReader(new InputStreamReader(in));
       String nextLine = "";
       while (null != (nextLine = br.readLine())) {
         result = nextLine;
       }
-    } finally {
-      try {
-        in.close();
-      } catch (IOException ex) {
-        _log.error("error closing url stream " + url);
-      }
+    } catch (Exception ex) {
+      _log.error("Exception trying to read from URL: " + ex.getMessage());
+      throw ex;
     }
-    _log.debug("result: " + result);
     return result;
   }
 }
