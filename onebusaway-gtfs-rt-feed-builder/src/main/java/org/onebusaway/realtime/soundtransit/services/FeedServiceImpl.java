@@ -622,10 +622,9 @@ public class FeedServiceImpl implements FeedService {
         }
       }
       stopUpdates = modStopUpdates;
-      List<StopTimeUpdate> dummyStopTimeUpdates = 
+      List<StopTimeUpdate> dummyStopTimeUpdates =
           buildPseudoStopTimeUpdates(stopUpdates, getTripDirection(trip));
       stopTimeUpdateList.addAll(dummyStopTimeUpdates);
-        
       for (StopUpdate stopUpdate : stopUpdates) {
         if (stopUpdate.getStopId() == null
             || stopUpdate.getStopId().isEmpty()) {
