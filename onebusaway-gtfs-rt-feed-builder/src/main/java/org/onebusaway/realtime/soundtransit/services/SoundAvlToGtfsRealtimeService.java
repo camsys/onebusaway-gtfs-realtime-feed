@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015 Cambridge Systematics, Inc.
+ * Copyright (C) 2016 Cambridge Systematics, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import javax.annotation.PreDestroy;
 import javax.servlet.ServletContext;
 
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import org.onebusaway.realtime.soundtransit.model.TripInfoList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -137,8 +138,18 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   void writeGtfsRealtimeOutput(String dataFromAvl) {
     LinkAVLData linkAVLData = _feedService.parseAVLFeed(dataFromAvl);
     if (linkAVLData != null) {
-      vehiclePositionsFM = _feedService.buildVPMessage(linkAVLData);
-      tripUpdatesFM = _feedService.buildTUMessage(linkAVLData);
+      TripInfoList tripInfoList = linkAVLData.getTrips();
+      if (tripInfoList != null && tripInfoList.getTrips() != null
+          && tripInfoList.getTrips().size() > 0) {
+        vehiclePositionsFM = _feedService.buildVPMessage(linkAVLData);
+        tripUpdatesFM = _feedService.buildTUMessage(linkAVLData);
+      } else {
+        String envMessage = tripInfoList != null ? tripInfoList.getEnvMessage() : null;
+        if (envMessage != null && !envMessage.isEmpty()) {
+          // Message is provided only if no data is available
+          _log.info("No data available: " + envMessage);
+        }
+      }
     }
   }
 
@@ -182,12 +193,8 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   private String readAvlUpdatesFromUrl(URL url) throws IOException {
     String result = "";
     HttpURLConnection avlConnection = (HttpURLConnection) url.openConnection();
-    avlConnection.setRequestProperty(
-        "Accept",
-        "text/html,application/xhtml+xml,application/json;q=0.9,application/xml;q=0.9,*/*;q=0.8");
     InputStream in = avlConnection.getInputStream();
     try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
-      //BufferedReader br = new BufferedReader(new InputStreamReader(in));
       String nextLine = "";
       while (null != (nextLine = br.readLine())) {
         result = nextLine;

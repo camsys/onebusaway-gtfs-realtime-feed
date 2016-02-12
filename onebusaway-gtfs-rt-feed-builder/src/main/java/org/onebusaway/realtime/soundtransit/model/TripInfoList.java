@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2015 Brian Ferris <bdferris@onebusaway.org>
+ * Copyright (C) 2016 Brian Ferris <bdferris@onebusaway.org>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,24 @@ import java.util.List;
 import org.codehaus.jackson.annotate.JsonProperty;
 
 public class TripInfoList {
-	@JsonProperty("Trip") private List<TripInfo> trips;
+  @JsonProperty("environment")
+  private String envMessage;
+  @JsonProperty("Trip")
+  private List<TripInfo> trips;
 
-	public List<TripInfo> getTrips() {
-		return trips;
-	}
-	public void setTrips(List<TripInfo> trips) {
-		this.trips = trips;
-	}
+  public String getEnvMessage() {
+    return envMessage;
+  }
+
+  public void setEnvMessage(String envMessage) {
+    this.envMessage = envMessage;
+  }
+
+  public List<TripInfo> getTrips() {
+    return trips;
+  }
+
+  public void setTrips(List<TripInfo> trips) {
+    this.trips = trips;
+  }
 }
