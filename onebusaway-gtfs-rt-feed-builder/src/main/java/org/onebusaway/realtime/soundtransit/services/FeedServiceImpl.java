@@ -185,7 +185,7 @@ public class FeedServiceImpl implements FeedService {
       _log.error("JsonParseException trying to parse feed data.");
       parseFailed = true;
     } catch (JsonMappingException e) {
-      _log.error("JsonMappingException trying to parse feed data.");
+      _log.error("JsonMappingException: " + e.getMessage());
       parseFailed = true;
     } catch (IOException e) {
       _log.error("IOException trying to parse feed data.");

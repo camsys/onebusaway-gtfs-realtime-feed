@@ -193,6 +193,16 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   private String readAvlUpdatesFromUrl(URL url) throws IOException {
     String result = "";
     HttpURLConnection avlConnection = (HttpURLConnection) url.openConnection();
+    avlConnection.setRequestProperty(
+        "Accept",
+//        "text/html,application/xhtml+xml,application/json;q=0.9,application/xml;q=0.9,*/*;q=0.8");
+//        "text/html,application/xhtml+xml,application/json,*/json;q=0.9,application/xml;q=0.9,*/*;q=0.8");
+//        "*/json;q=0.9");
+//        "*/json,application/json");
+//        "*/json;q=0.9,application/json;q=0.8");
+//        "application/json,*/json");
+//        "*/json;q=0.9,application/json;q=0.8,application/xml;q=0.7");
+        "*/json;q=0.9,application/json;q=0.8,*/xml;q=0.7");
     InputStream in = avlConnection.getInputStream();
     try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
       String nextLine = "";
