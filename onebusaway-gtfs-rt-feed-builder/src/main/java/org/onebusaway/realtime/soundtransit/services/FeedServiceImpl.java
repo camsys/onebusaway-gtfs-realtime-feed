@@ -315,15 +315,8 @@ public class FeedServiceImpl implements FeedService {
     return result;
   }
   
-  private String convert1899Date(String oldDateString) {
-    SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-    String today = formatter.format(new Date());
-    String todaysDateString = today 
-        + oldDateString.substring(oldDateString.indexOf("T"));
-    return todaysDateString;
-  }
-
   public FeedMessage buildVPMessage(LinkAVLData linkAVLData) {
+    _log.debug("Starting buildVPMessage");
     // Update the list of trips (done only if the date has changed
     updateTripsAndStops();
     
@@ -433,11 +426,12 @@ public class FeedServiceImpl implements FeedService {
       vehiclePositionsFM = FeedMessage.getDefaultInstance();
     }
     _log.info("vehicle position updates: " + vehiclePositionEntityCount);
-    _log.debug("*****finishing buildVPMessage");
+    _log.debug("finishing buildVPMessage");
     return vehiclePositionsFM;
   }
 
   public FeedMessage buildTUMessage(LinkAVLData linkAVLData) {
+    _log.debug("Starting buildTUMessage");
     // Update the list of trips (done only if the date has changed)
     updateTripsAndStops();
     
@@ -464,7 +458,9 @@ public class FeedServiceImpl implements FeedService {
         }
         TripUpdate.Builder tu = TripUpdate.newBuilder();
         // Build the StopTimeUpdates
+        _log.debug("Building stop updates");
         List<StopTimeUpdate> stopTimeUpdates = buildStopTimeUpdateList(trip);
+        _log.debug("Stop update list size: " + stopTimeUpdates.size());
         tu.addAllStopTimeUpdate(stopTimeUpdates);
 
         // Build the VehicleDescriptor
@@ -514,6 +510,7 @@ public class FeedServiceImpl implements FeedService {
       tripUpdatesFM = FeedMessage.getDefaultInstance();
     }
     _log.info("trip updates: " + tripUpdateEntityCount);
+    _log.debug("Ending buildTUMessage");
     return tripUpdatesFM;
   }
 
@@ -622,9 +619,11 @@ public class FeedServiceImpl implements FeedService {
         }
       }
       stopUpdates = modStopUpdates;
-      List<StopTimeUpdate> dummyStopTimeUpdates =
-          buildPseudoStopTimeUpdates(stopUpdates, getTripDirection(trip));
-      stopTimeUpdateList.addAll(dummyStopTimeUpdates);
+      //_log.debug("About to build dummy stop updates");
+      //List<StopTimeUpdate> dummyStopTimeUpdates =
+      //    buildPseudoStopTimeUpdates(stopUpdates, getTripDirection(trip));
+      //_log.debug("Finished building dummy stop updates");
+      //stopTimeUpdateList.addAll(dummyStopTimeUpdates);
       for (StopUpdate stopUpdate : stopUpdates) {
         if (stopUpdate.getStopId() == null
             || stopUpdate.getStopId().isEmpty()) {
@@ -636,7 +635,7 @@ public class FeedServiceImpl implements FeedService {
           if (arrivalTime == null) {
             arrivalTime = arrivalTimeDetails.getEstimated();
           }
-          if (arrivalTime != null) {
+          if (arrivalTime != null && !arrivalTime.isEmpty()) {
             StopTimeUpdate stopTimeUpdate = 
                 buildStopTimeUpdate(stopUpdate.getStopId(),
                     arrivalTime, getTripDirection(trip), "");
@@ -709,7 +708,7 @@ public class FeedServiceImpl implements FeedService {
     // Set trip start time and date from tripStartTime
     Date tripStartTime = getTripStartTime(trip.getStopUpdates());
     if (tripStartTime != null) {
-      DateFormat df = new SimpleDateFormat("kk:mm:ss");
+      DateFormat df = new SimpleDateFormat("HH:mm:ss");
       String startTime = df.format(tripStartTime);
       df = new SimpleDateFormat("yyyyMMdd");
       String startDate = df.format(tripStartTime);
@@ -889,7 +888,6 @@ public class FeedServiceImpl implements FeedService {
     String tripId = "";
     TripEntry lastTrip = null;
     for (TripEntry gtfsTripEntry : tripEntries) {
-      _log.debug("GTFS trip id: " + gtfsTripEntry.getId().getId());
       if (!direction.equals(gtfsTripEntry.getDirectionId())) {
         if (lastTrip != null) {
           tripId = lastTrip.getId().getId();
@@ -921,9 +919,6 @@ public class FeedServiceImpl implements FeedService {
   		List<FrequencyEntry> frequencies = blocks.get(0).getFrequencies();
   		if (frequencies.size() > 0) {
   			startTime = frequencies.get(0).getStartTime();
-  			for (FrequencyEntry frequency : frequencies) {
-  			  _log.debug("Frequency start time: " + frequency.getStartTime());
-  			}
   		}
   	}
   	return startTime;
@@ -971,11 +966,12 @@ public class FeedServiceImpl implements FeedService {
     while (!pseudoStopId.equals(firstRealStopId)) {
       String dummyArrivalTime = 
           getAdjustedTime(firstRealStopId, arrivalTimeDetails, pseudoStopId, dir);
+      if (!dummyArrivalTime.isEmpty()) {
+        StopTimeUpdate stopTimeUpdate = 
+            buildStopTimeUpdate(pseudoStopId, dummyArrivalTime, dir, "SKIPPED");
       
-      StopTimeUpdate stopTimeUpdate = 
-          buildStopTimeUpdate(pseudoStopId, dummyArrivalTime, dir, "SKIPPED");
-      
-      dummyStopTimeUpdateList.add(stopTimeUpdate);
+        dummyStopTimeUpdateList.add(stopTimeUpdate);
+      }
       pseudoStopId = stopOffsets.get(++idx).getLinkStopId();
     }
 
