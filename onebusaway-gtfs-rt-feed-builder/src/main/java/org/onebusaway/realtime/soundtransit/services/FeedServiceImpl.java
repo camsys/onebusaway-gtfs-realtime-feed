@@ -80,6 +80,8 @@ import com.google.transit.realtime.GtfsRealtimeConstants;
 public class FeedServiceImpl implements FeedService {
   private static Logger _log = LoggerFactory.getLogger(FeedServiceImpl.class);
   private static String PINE_STREET_STUB = "PNSS_PLAT"; // Not really a stop.
+  private static int TRIP_CUTOVER_HOUR = 3; // Trips starting before this hour
+                                            // will be set to the previous day
   private TransitGraphDao _transitGraphDao;
   private ExtendedCalendarService _calendarService;
   private Map<String, String> stopMapping = null;
@@ -710,6 +712,18 @@ public class FeedServiceImpl implements FeedService {
     if (tripStartTime != null) {
       DateFormat df = new SimpleDateFormat("HH:mm:ss");
       String startTime = df.format(tripStartTime);
+
+      // If time is after midnight, add 24 to the hour and move date back one
+      // so the tds can match up the trip to the correct service id.
+      Calendar cal = Calendar.getInstance();
+      cal.setTime(tripStartTime);
+      if (cal.get(Calendar.HOUR_OF_DAY) < TRIP_CUTOVER_HOUR) {
+        int hour = cal.get(Calendar.HOUR_OF_DAY) + 24;
+        startTime = "" + hour + startTime.substring(3);
+        cal.add(Calendar.DAY_OF_YEAR, -1);
+        tripStartTime = cal.getTime();
+      }
+
       df = new SimpleDateFormat("yyyyMMdd");
       String startDate = df.format(tripStartTime);
       td.setStartTime(startTime);
