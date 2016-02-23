@@ -919,7 +919,7 @@ public class FeedServiceImpl implements FeedService {
       }
       lastTrip = gtfsTripEntry;
     }
-    if (tripId == null) {  // Assign it to the last trip
+    if (tripId.isEmpty()) {  // Assign it to the last trip
       tripId = tripEntries.get(tripEntries.size()-1).getId().getId();
     }
     return tripId;
