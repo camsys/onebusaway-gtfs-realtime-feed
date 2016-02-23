@@ -621,11 +621,11 @@ public class FeedServiceImpl implements FeedService {
         }
       }
       stopUpdates = modStopUpdates;
-      //_log.debug("About to build dummy stop updates");
-      //List<StopTimeUpdate> dummyStopTimeUpdates =
-      //    buildPseudoStopTimeUpdates(stopUpdates, getTripDirection(trip));
-      //_log.debug("Finished building dummy stop updates");
-      //stopTimeUpdateList.addAll(dummyStopTimeUpdates);
+      _log.debug("About to build dummy stop updates");
+      List<StopTimeUpdate> dummyStopTimeUpdates =
+          buildPseudoStopTimeUpdates(stopUpdates, getTripDirection(trip));
+      _log.debug("Finished building dummy stop updates");
+      stopTimeUpdateList.addAll(dummyStopTimeUpdates);
       for (StopUpdate stopUpdate : stopUpdates) {
         if (stopUpdate.getStopId() == null
             || stopUpdate.getStopId().isEmpty()) {
@@ -951,8 +951,6 @@ public class FeedServiceImpl implements FeedService {
     List<StopTimeUpdate> dummyStopTimeUpdateList = new ArrayList<StopTimeUpdate>();
     List<StopOffset> stopOffsets = (dir.equals("0")) ? sbStopOffsets : nbStopOffsets;
     int numberOfStops = stopOffsets.size();
-    String firstRealStopId = stopUpdates.get(0).getStopId();
-    int firstRealStopIdx = 0;
     
     // Make sure the first real stop is headed in the right direction,
     // since a train may come onto the line at a NB platform, for instance,
@@ -962,6 +960,8 @@ public class FeedServiceImpl implements FeedService {
     if (dir.equals("0")) {
       wrongDir = "NB";
     }
+    String firstRealStopId = stopUpdates.get(0).getStopId();
+    int firstRealStopIdx = 0;
     if (firstRealStopId.startsWith(wrongDir)) {
       for (int i=0; i < stopUpdates.size(); i++) {
         if (!stopUpdates.get(i).getStopId().startsWith(wrongDir)) {
