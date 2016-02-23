@@ -682,6 +682,10 @@ public class FeedServiceImpl implements FeedService {
         formattedTime = formattedTime.substring(formattedTime.indexOf('T')+1, formattedTime.indexOf('T') + 9);
         String[] timeArray = formattedTime.split(":");
         int hours = Integer.parseInt(timeArray[0]);
+        // If time is after midnight, add 24 to the hour
+        if (hours < TRIP_CUTOVER_HOUR) {
+          hours += 24;
+        }
         int minutes = Integer.parseInt(timeArray[1]);
         scheduledTime = (hours * 60 + minutes) * 60;
         break;
@@ -719,7 +723,7 @@ public class FeedServiceImpl implements FeedService {
       cal.setTime(tripStartTime);
       if (cal.get(Calendar.HOUR_OF_DAY) < TRIP_CUTOVER_HOUR) {
         int hour = cal.get(Calendar.HOUR_OF_DAY) + 24;
-        startTime = "" + hour + startTime.substring(3);
+        startTime = "" + hour + startTime.substring(2);
         cal.add(Calendar.DAY_OF_YEAR, -1);
         tripStartTime = cal.getTime();
       }
