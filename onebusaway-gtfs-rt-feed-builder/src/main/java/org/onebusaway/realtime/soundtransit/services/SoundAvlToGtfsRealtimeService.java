@@ -109,10 +109,6 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     _refreshExecutor = Executors.newSingleThreadScheduledExecutor();
     _refreshExecutor.scheduleAtFixedRate(new RefreshTransitData(), delay,
         _refreshInterval, TimeUnit.SECONDS);
-
-    _delayExecutor = Executors.newSingleThreadScheduledExecutor();
-    _delayExecutor.scheduleAtFixedRate(new DelayThread(), _refreshInterval,
-        _refreshInterval / 2, TimeUnit.SECONDS);
   }
 
   @PreDestroy
@@ -181,12 +177,6 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
       } catch (Exception ex) {
         _log.error("Failed to refresh TransitData: " + ex.getMessage());
       }
-    }
-  }
-  private class DelayThread implements Runnable {
-    public void run() {
-      long updateTime = (System.currentTimeMillis() - _lastUpdateTime) / 1000;
-      _log.info("seconds since last update:" + updateTime);
     }
   }
 
