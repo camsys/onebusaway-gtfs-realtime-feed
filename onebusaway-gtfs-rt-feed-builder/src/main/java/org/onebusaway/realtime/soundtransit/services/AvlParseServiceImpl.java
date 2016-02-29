@@ -86,15 +86,12 @@ public class AvlParseServiceImpl implements AvlParseService {
                 String estimated = arrivalTime.getEstimated();
                 String scheduled = arrivalTime.getScheduled();
                 if (actual != null && actual.startsWith("1899")) {
-                  //actual = convert1899Date(actual);
                   arrivalTime.setActual(null);
                 }
                 if (estimated != null && estimated.startsWith("1899")) {
-                  //estimated = convert1899Date(estimated);
                   arrivalTime.setEstimated(null);
                 }
                 if (scheduled != null && scheduled.startsWith("1899")) {
-                  //scheduled = convert1899Date(scheduled);
                   arrivalTime.setScheduled(null);
                 }
               }

@@ -15,14 +15,12 @@
  */
 package org.onebusaway.realtime.soundtransit.services;
 
-import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import org.onebusaway.realtime.soundtransit.model.TripInfo;
 
-import com.google.transit.realtime.GtfsRealtime.FeedMessage;
+import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 
-public interface FeedService {
-    LinkAVLData parseAVLFeed(String dataFromAvl);
-    FeedMessage buildVPMessage(LinkAVLData linkAVLData);
-    FeedMessage buildTUMessage(LinkAVLData linkAVLData);
-    FeedMessage getCurrentVehiclePositions();
-    FeedMessage getCurrentTripUpdates();
+public interface LinkTripService {
+  public void updateTripsAndStops();
+  public String getTripDirection(TripInfo trip);
+  public TripDescriptor buildTripDescriptor(TripInfo trip);
 }

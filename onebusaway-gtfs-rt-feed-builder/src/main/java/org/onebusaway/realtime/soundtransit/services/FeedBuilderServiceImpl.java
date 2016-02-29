@@ -16,13 +16,23 @@
 package org.onebusaway.realtime.soundtransit.services;
 
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
-
+import org.springframework.beans.factory.annotation.Autowired;
 import com.google.transit.realtime.GtfsRealtime.FeedMessage;
 
-public interface FeedService {
-    LinkAVLData parseAVLFeed(String dataFromAvl);
-    FeedMessage buildVPMessage(LinkAVLData linkAVLData);
-    FeedMessage buildTUMessage(LinkAVLData linkAVLData);
-    FeedMessage getCurrentVehiclePositions();
-    FeedMessage getCurrentTripUpdates();
+public abstract class FeedBuilderServiceImpl implements FeedBuilderService {
+  protected LinkTripService _linkTripService;
+  protected LinkStopService _linkStopService;
+
+  @Autowired
+  public void setLinkTripServiceImpl(LinkTripService linkTripService) {
+    _linkTripService = linkTripService;
+  }
+
+  @Autowired
+  public void setLinkStopServiceImpl(LinkStopService linkStopService) {
+    _linkStopService = linkStopService;
+  }
+
+  @Override
+  public abstract FeedMessage buildFeedMessage(LinkAVLData linkAVLData);
 }

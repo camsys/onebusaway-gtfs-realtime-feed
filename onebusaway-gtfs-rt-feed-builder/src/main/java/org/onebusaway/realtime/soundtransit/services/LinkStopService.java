@@ -15,14 +15,17 @@
  */
 package org.onebusaway.realtime.soundtransit.services;
 
-import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import java.util.List;
 
-import com.google.transit.realtime.GtfsRealtime.FeedMessage;
+import org.onebusaway.realtime.soundtransit.model.StopOffset;
+import org.onebusaway.realtime.soundtransit.model.StopUpdate;
+import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
+import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 
-public interface FeedService {
-    LinkAVLData parseAVLFeed(String dataFromAvl);
-    FeedMessage buildVPMessage(LinkAVLData linkAVLData);
-    FeedMessage buildTUMessage(LinkAVLData linkAVLData);
-    FeedMessage getCurrentVehiclePositions();
-    FeedMessage getCurrentTripUpdates();
+public interface LinkStopService {
+  public void updateStopOffsets(List<TripEntry> tripEntries);
+  public boolean isValidLinkStop(String stopId);
+  public String getGTFSStop(String avlStopId, String direction);
+  public List<StopOffset> getStopOffsets(String direction);
+  public StopUpdate findNextStopOnTrip(StopUpdatesList stopUpdatesList);
 }

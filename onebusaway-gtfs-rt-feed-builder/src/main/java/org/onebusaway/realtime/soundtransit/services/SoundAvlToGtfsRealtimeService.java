@@ -50,7 +50,6 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 
   private static final Logger _log = LoggerFactory.getLogger(SoundAvlToGtfsRealtimeService.class);
   private ScheduledExecutorService _refreshExecutor;
-  private ScheduledExecutorService _delayExecutor;
   private FeedService _feedService;
   private URL _linkAvlFeedUrl;
 
@@ -60,7 +59,6 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   
   private FeedMessage vehiclePositionsFM = null;
   private FeedMessage tripUpdatesFM = null;
-  private static long _lastUpdateTime = System.currentTimeMillis();
 
 
   public void setRefreshOffset(String refreshOffset) {
@@ -103,7 +101,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 @PostConstruct
   public void start() throws Exception {
     _log.info("starting GTFS-realtime service");
-    _feedService.init();
+    //_feedService.init();
     int delay = ((_refreshOffset + 60) - (int)(System.currentTimeMillis()/1000 % 60)) % 60;
     _log.info("Offset: " + _refreshOffset + ", delay: " + delay);
     _refreshExecutor = Executors.newSingleThreadScheduledExecutor();
@@ -172,7 +170,6 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
       try {
         _log.info("refreshing vehicles");
         writeGtfsRealtimeOutput();
-        _lastUpdateTime = System.currentTimeMillis();
         _log.info("GTFS-rt feed updated");
       } catch (Exception ex) {
         _log.error("Failed to refresh TransitData: " + ex.getMessage());
