@@ -74,11 +74,11 @@ public class FeedServiceBuildMessageTest {
     List<TripEntry> allTrips = buildTripsForFrequencyTrips();
     Mockito.when(_transitGraphDao.getAllTrips()).thenReturn(allTrips);
     _feedService = new FeedServiceImpl();
-    _feedService.setTransitGraphDao(_transitGraphDao);
-    _feedService.setLinkRouteId("100479");
-    _feedService.setTripEntries(new ArrayList<TripEntry>());
-    _feedService.init();
-    _feedService.setTripEntries(buildTripsForFrequencyTrips());
+    //_feedService.setTransitGraphDao(_transitGraphDao);
+    //_feedService.setLinkRouteId("100479");
+    //_feedService.setTripEntries(new ArrayList<TripEntry>());
+    //_feedService.init();
+    //_feedService.setTripEntries(buildTripsForFrequencyTrips());
 
     parsedLinkAVLData_1 = parseAVLDataFromFile(LINK_AVL_DATA_1);
     vehiclePositionsFM_1 = _feedService.buildVPMessage(parsedLinkAVLData_1);
