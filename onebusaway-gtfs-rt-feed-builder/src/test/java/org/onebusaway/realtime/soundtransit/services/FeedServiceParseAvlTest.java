@@ -32,24 +32,24 @@ import org.junit.Test;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.realtime.soundtransit.model.TripInfoList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class FeedServiceParseAvlTest {
   
-  private static final Logger _log = LoggerFactory.getLogger(FeedServiceParseAvlTest.class);
-
   private static final String LINK_AVL_DATA_1 = "src/test/resources/LinkAvlData.txt";
   private static final String LINK_AVL_DATA_2 = "src/test/resources/LinkAvlData_2.txt";
-  
+
   private static FeedServiceImpl _feedService = null;
-  
+  private static AvlParseServiceImpl avlParseService;
+
   private static LinkAVLData parsedLinkAVLData_1;
   private static LinkAVLData parsedLinkAVLData_2;
-  
+
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
     _feedService = new FeedServiceImpl();
+    avlParseService = new AvlParseServiceImpl();
+    _feedService.setAvlParseService(avlParseService);
+
     parsedLinkAVLData_1 = parseAVLDataFromFile(LINK_AVL_DATA_1);
     parsedLinkAVLData_2 = parseAVLDataFromFile(LINK_AVL_DATA_2);
   }
@@ -95,7 +95,7 @@ public class FeedServiceParseAvlTest {
     // trip_1 has no stop updates in the feed, so the List of StopUpdates should be null
     TripInfo trip_1 = trips.get(0);
     assertNull(trip_1.getStopUpdates().getUpdates());
-        
+
     TripInfo trip_2 = trips.get(1);
     assertEquals(9, trip_2.getStopUpdates().getUpdates().size());
 

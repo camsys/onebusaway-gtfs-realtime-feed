@@ -56,19 +56,27 @@ public class LinkTripServiceImpl implements LinkTripService {
   private List<TripEntry> tripEntries;
   private static String _linkRouteId;
 
+  public void setTimeToUpdateTripIds(long timeToUpdateTripIds) { // For testing
+    this.timeToUpdateTripIds = timeToUpdateTripIds;
+  }
+
   @Autowired
   public void setTransitGraphDao(TransitGraphDao transitGraphDao) {
     _transitGraphDao = transitGraphDao;
   }
 
   @Autowired
-  public void set_calendarService(ExtendedCalendarService _calendarService) {
-    this._calendarService = _calendarService;
+  public void setCalendarService(ExtendedCalendarService calendarService) {
+    _calendarService = calendarService;
   }
 
   @Autowired
   public void setLinkStopServiceImpl(LinkStopService linkStopService) {
     _linkStopService = linkStopService;
+  }
+
+  public void setTripEntries(List<TripEntry> tripEntries) {  // For JUnit tests
+    this.tripEntries = tripEntries;
   }
 
   public void setLinkRouteId(String linkRouteId) {

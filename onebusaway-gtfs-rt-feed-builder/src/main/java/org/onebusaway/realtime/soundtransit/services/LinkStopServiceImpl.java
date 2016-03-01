@@ -49,8 +49,20 @@ public class LinkStopServiceImpl implements LinkStopService {
   private List<StopOffset> nbStopOffsets = new ArrayList<StopOffset>();// Northbound
   private List<StopOffset> sbStopOffsets = new ArrayList<StopOffset>();// Southbound
 
+  public void setStopMapping(Map<String, String> stopMapping) { // For testing
+    this.stopMapping = stopMapping;
+  }
+
   public void setLinkStopMappingFile(String linkStopMappingFile) {
     _linkStopMappingFile = linkStopMappingFile;
+  }
+
+  public void setNbStopOffsets(List<StopOffset> nbStopOffsets) {
+    this.nbStopOffsets = nbStopOffsets;
+  }
+
+  public void setSbStopOffsets(List<StopOffset> sbStopOffsets) {
+    this.sbStopOffsets = sbStopOffsets;
   }
 
   @PostConstruct
