@@ -22,9 +22,11 @@ import java.util.Comparator;
 import java.util.List;
 
 import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.map.DeserializationConfig;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.SerializationConfig;
+import org.codehaus.jackson.type.TypeReference;
 import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
@@ -40,11 +42,12 @@ public class AvlParseServiceImpl implements AvlParseService {
   @Override
   public LinkAVLData parseAVLFeed(String feedData) {
     LinkAVLData linkAVLData = new LinkAVLData();
-    ObjectMapper mapper = new ObjectMapper();
+    ObjectMapper mapper = new ObjectMapper().enable(DeserializationConfig
+        .Feature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
     mapper.configure(SerializationConfig.Feature.AUTO_DETECT_FIELDS, true);
     boolean parseFailed = false;
     try {
-      linkAVLData = mapper.readValue(feedData, LinkAVLData.class);
+      linkAVLData = mapper.readValue(feedData, new TypeReference<LinkAVLData>(){});
       if (linkAVLData != null) {
         _log.debug("Parsed AVL data: " + mapper.writeValueAsString(linkAVLData));
       }

@@ -88,7 +88,6 @@ public class FeedServiceBuildMessageTest {
     stopMapping = buildStopMapping(STOP_MAPPING_FILE);
     nbStopOffsets = buildNbStopOffsets();
     sbStopOffsets = buildSbStopOffsets();
-   //linkStopService = Mockito.mock(LinkStopServiceImpl.class);
     linkStopService = new LinkStopServiceImpl();
     linkStopService.setStopMapping(stopMapping);
     linkStopService.setNbStopOffsets(nbStopOffsets);
