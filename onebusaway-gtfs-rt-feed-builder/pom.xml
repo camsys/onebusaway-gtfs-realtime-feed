@@ -18,24 +18,11 @@
 		  <scope>provided</scope>
 		</dependency>
 
-		<!-- <dependency> <groupId>net.sf.opencsv</groupId> <artifactId>opencsv</artifactId> 
-			<version>2.0</version> </dependency> -->
-<!-- 		<dependency> -->
-<!-- 			<groupId>org.onebusaway</groupId> -->
-<!-- 			<artifactId>onebusaway-gtfs-realtime-exporter</artifactId> -->
-<!-- 			<version>1.1.1-SNAPSHOT</version> -->
-<!-- 		</dependency> -->
-<!-- 		<dependency> -->
-<!-- 			<groupId>org.onebusaway</groupId> -->
-<!-- 			<artifactId>onebusaway-guice-jsr250</artifactId> -->
-<!-- 			<version>1.0.2-SNAPSHOT</version> -->
-<!-- 		</dependency> -->
-
 		<!-- OneBusAway Dependencies -->
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-transit-data-federation</artifactId>
-			<version>1.1.15.1-cs-SNAPSHOT</version>
+			<version>1.1.15.21-cs-SNAPSHOT</version>
 		</dependency>
 	    <dependency>
 	      <groupId>org.onebusaway</groupId>

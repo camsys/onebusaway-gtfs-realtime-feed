@@ -87,7 +87,8 @@ public class LinkTripServiceImpl implements LinkTripService {
   public void updateTripsAndStops() {
     // Check if date has changed.
     // If it has, update the trips ids so they are valid for this service date
-    if ((new Date()).getTime() > timeToUpdateTripIds) {
+    if ((new Date()).getTime() > timeToUpdateTripIds 
+        || tripEntries == null || tripEntries.size() == 0) {
       tripEntries = getLinkTrips();
       Calendar nextUpdate = Calendar.getInstance();  // Start with today
       nextUpdate.set(Calendar.HOUR_OF_DAY, 0);
