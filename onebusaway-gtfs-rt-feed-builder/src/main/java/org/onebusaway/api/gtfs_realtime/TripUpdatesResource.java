@@ -47,7 +47,6 @@ public class TripUpdatesResource extends GtfsRealtimeResource {
   @GET
   @Produces("text/plain")
   public String getTestMessage() {
-	  //return _feedService.getCurrentTripUpdates();
 	  return "Test Message";
   }
   
@@ -67,7 +66,6 @@ public class TripUpdatesResource extends GtfsRealtimeResource {
   
   @Path("pb")
   @GET
-  //@Produces("application/octet-stream")
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   public byte[] getRealtimeTripUpdatesPB() {
 	  FeedMessage currentTripUpdates = _feedService.getCurrentTripUpdates();
@@ -77,49 +75,4 @@ public class TripUpdatesResource extends GtfsRealtimeResource {
 	    return new byte[0];
 	  }
   }
-  
-  //@Override
-  //protected FeedMessage fillFeedMessage() {
-  //  return _feedService.getCurrentTripUpdates();
-  //}
-
-  /*
-  @Override
-  protected void fillFeedMessage(FeedMessage.Builder feed, String agencyId,
-      long timestamp) {
-
-    ListBean<VehicleStatusBean> vehicles = _service.getAllVehiclesForAgency(
-        agencyId, timestamp);
-
-    for (VehicleStatusBean vehicle : vehicles.getList()) {
-      TripStatusBean tripStatus = vehicle.getTripStatus();
-      if (tripStatus == null) {
-        continue;
-      }
-      TripBean activeTrip = tripStatus.getActiveTrip();
-      RouteBean route = activeTrip.getRoute();
-
-      FeedEntity.Builder entity = feed.addEntityBuilder();
-      entity.setId(Integer.toString(feed.getEntityCount()));
-      TripUpdate.Builder tripUpdate = entity.getTripUpdateBuilder();
-
-      TripDescriptor.Builder tripDesc = tripUpdate.getTripBuilder();
-      tripDesc.setTripId(normalizeId(activeTrip.getId()));
-      tripDesc.setRouteId(normalizeId(route.getId()));
-
-      VehicleDescriptor.Builder vehicleDesc = tripUpdate.getVehicleBuilder();
-      vehicleDesc.setId(normalizeId(vehicle.getVehicleId()));
-
-      StopBean nextStop = tripStatus.getNextStop();
-      if (nextStop != null) {
-        TripUpdate.StopTimeUpdate.Builder stopTimeUpdate = tripUpdate.addStopTimeUpdateBuilder();
-        stopTimeUpdate.setStopId(normalizeId(nextStop.getId()));
-        TripUpdate.StopTimeEvent.Builder departure = stopTimeUpdate.getDepartureBuilder();
-        departure.setTime(timestamp / 1000 + tripStatus.getNextStopTimeOffset());
-      }
-
-      tripUpdate.setTimestamp(vehicle.getLastUpdateTime() / 1000);
-    }
-  }
-  */
 }

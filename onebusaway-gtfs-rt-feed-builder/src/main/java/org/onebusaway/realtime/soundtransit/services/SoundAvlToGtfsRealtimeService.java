@@ -101,7 +101,6 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 @PostConstruct
   public void start() throws Exception {
     _log.info("starting GTFS-realtime service");
-    //_feedService.init();
     int delay = ((_refreshOffset + 60) - (int)(System.currentTimeMillis()/1000 % 60)) % 60;
     _log.info("Offset: " + _refreshOffset + ", delay: " + delay);
     _refreshExecutor = Executors.newSingleThreadScheduledExecutor();

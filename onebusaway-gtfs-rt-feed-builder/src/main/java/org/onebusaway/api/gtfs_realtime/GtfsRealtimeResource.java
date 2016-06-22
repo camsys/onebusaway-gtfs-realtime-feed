@@ -36,9 +36,6 @@ public abstract class GtfsRealtimeResource {
 
   private static final int V2 = 2;
 
-  //@Autowired
-  //protected TransitDataService _service;
-  
   @Autowired
   protected FeedService _feedService;
 
@@ -47,14 +44,6 @@ public abstract class GtfsRealtimeResource {
   private long _time;
 
   private boolean _removeAgencyIds = true;
-
-  //public GtfsRealtimeResource() {
-  //  super(V2);
-  //}
-  
-  //public void setTransitDataService(TransitDataService service) {
-  //  _service = service;
-  //}
 
   @RequiredFieldValidator
   public void setId(String id) {
@@ -75,34 +64,9 @@ public abstract class GtfsRealtimeResource {
   }
 
   public DefaultHttpHeaders show() throws ServiceException {
-  //  if (!isVersion(V2))
-  //    return setUnknownVersionResponse();
-/*
-    if (hasErrors())
-      return setValidationErrorsResponse();
-
-    long time = System.currentTimeMillis();
-    if (_time != 0)
-      time = _time;
-
-    FeedMessage.Builder feed = FeedMessage.newBuilder();
-    FeedHeader.Builder header = feed.getHeaderBuilder();
-    header.setGtfsRealtimeVersion(GtfsRealtimeConstants.VERSION);
-    header.setTimestamp(time / 1000);
-    fillFeedMessage(feed, _agencyId, time);
-    */
-    //return setOkResponse(feed.build());
-    //FeedMessage feedmessage = fillFeedMessage();
-    //return setOkResponse(feedMessage);
-    //return setOkResponse("Test message");
     return null;
   }
 
-//  protected abstract void fillFeedMessage(FeedMessage.Builder feed,
-//      String agencyId, long timestamp);
-
-  //protected abstract FeedMessage fillFeedMessage();
-  
   protected String normalizeId(String id) {
     if (_removeAgencyIds) {
       int index = id.indexOf('_');

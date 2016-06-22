@@ -43,7 +43,6 @@ public class VehiclePositionsResource extends GtfsRealtimeResource {
   @GET
   @Produces("text/plain")
   public String getTestMessage() {
-	  //return _feedService.getCurrentTripUpdates();
 	  return "Test Message from vehicle-positions feed";
   }
   
@@ -73,48 +72,4 @@ public class VehiclePositionsResource extends GtfsRealtimeResource {
     }
 
   }
-  
-  //@Override
-  //protected FeedMessage fillFeedMessage() {
-  //  return _feedService.getCurrentVehiclePositions();
-  //}
-
-  
-  /*
-  @Override
-  protected void fillFeedMessage(FeedMessage.Builder feed, String agencyId,
-      long timestamp) {
-
-    ListBean<VehicleStatusBean> vehicles = _service.getAllVehiclesForAgency(
-        agencyId, timestamp);
-
-    for (VehicleStatusBean vehicle : vehicles.getList()) {
-      FeedEntity.Builder entity = feed.addEntityBuilder();
-      entity.setId(Integer.toString(feed.getEntityCount()));
-      VehiclePosition.Builder vehiclePosition = entity.getVehicleBuilder();
-
-      TripStatusBean tripStatus = vehicle.getTripStatus();
-      if (tripStatus != null) {
-        TripBean activeTrip = tripStatus.getActiveTrip();
-        RouteBean route = activeTrip.getRoute();
-
-        TripDescriptor.Builder tripDesc = vehiclePosition.getTripBuilder();
-        tripDesc.setTripId(normalizeId(activeTrip.getId()));
-        tripDesc.setRouteId(normalizeId(route.getId()));
-      }
-
-      VehicleDescriptor.Builder vehicleDesc = vehiclePosition.getVehicleBuilder();
-      vehicleDesc.setId(normalizeId(vehicle.getVehicleId()));
-
-      CoordinatePoint location = vehicle.getLocation();
-      if (location != null) {
-        Position.Builder position = vehiclePosition.getPositionBuilder();
-        position.setLatitude((float) location.getLat());
-        position.setLongitude((float) location.getLon());
-      }
-
-  vehiclePosition.setTimestamp(vehicle.getLastUpdateTime() / 1000);
-}
-}
-*/
 }
