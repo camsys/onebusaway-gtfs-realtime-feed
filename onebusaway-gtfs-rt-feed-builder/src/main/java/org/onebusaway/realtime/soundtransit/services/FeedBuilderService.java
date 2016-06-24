@@ -20,5 +20,6 @@ import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import com.google.transit.realtime.GtfsRealtime.FeedMessage;
 
 public interface FeedBuilderService {
-  public FeedMessage buildFeedMessage(LinkAVLData linkAVLData);
+  public FeedMessage buildFrequencyFeedMessage(LinkAVLData linkAVLData);
+  public FeedMessage buildScheduleFeedMessage(LinkAVLData linkAVLData);
 }

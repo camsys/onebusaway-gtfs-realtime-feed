@@ -32,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.transit.realtime.GtfsRealtime;
+import com.google.transit.realtime.GtfsRealtime.FeedMessage.Builder;
 import com.google.transit.realtime.GtfsRealtimeConstants;
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
 import com.google.transit.realtime.GtfsRealtime.FeedHeader;
@@ -46,20 +47,18 @@ import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
 public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
   private static Logger _log = LoggerFactory.getLogger(TUFeedBuilderServiceImpl.class);
 
+  public AvlParseService avlParseService = new AvlParseServiceImpl();
+  
   @Override
-  public FeedMessage buildFeedMessage(LinkAVLData linkAVLData) {
+  public FeedMessage buildFrequencyFeedMessage(LinkAVLData linkAVLData) {
     // Update the list of trips (done only if the date has changed)
     _linkTripService.updateTripsAndStops();
+    
+    FeedMessage.Builder feedMessageBuilder = buildHeader();
     
     int tripUpdateEntityCount = 0;
     FeedMessage tripUpdatesFM = null;
     TripInfoList tripInfoList = linkAVLData.getTrips();
-    FeedMessage.Builder feedMessageBuilder = FeedMessage.newBuilder();
-    FeedHeader.Builder header = FeedHeader.newBuilder();
-    header.setTimestamp(System.currentTimeMillis()/1000);
-    header.setIncrementality(Incrementality.FULL_DATASET);
-    header.setGtfsRealtimeVersion(GtfsRealtimeConstants.VERSION);
-    feedMessageBuilder.setHeader(header);
     List<TripInfo> trips = tripInfoList != null ? tripInfoList.getTrips() : null;
     if (trips != null) {
       for (TripInfo trip : trips) {
@@ -71,7 +70,7 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         }
         TripUpdate.Builder tu = TripUpdate.newBuilder();
         // Build the StopTimeUpdates
-        List<StopTimeUpdate> stopTimeUpdates = buildStopTimeUpdateList(trip);
+        List<StopTimeUpdate> stopTimeUpdates = buildFrequencyStopTimeUpdateList(trip);
         tu.addAllStopTimeUpdate(stopTimeUpdates);
 
         // Build the VehicleDescriptor
@@ -86,7 +85,7 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         tu.setVehicle(vd);
 
         // Build the TripDescriptor
-        TripDescriptor td = _linkTripService.buildTripDescriptor(trip);
+        TripDescriptor td = _linkTripService.buildFrequencyTripDescriptor(trip);
         tu.setTrip(td);
 
         // Set timestamp to trip LastUpdatedDate
@@ -94,8 +93,7 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         String lastUpdatedDate = trip.getLastUpdatedDate();
         if (lastUpdatedDate != null) {
           try {
-            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-            Date parsedDate = df.parse(lastUpdatedDate);
+            Date parsedDate = avlParseService.parseAvlTime(lastUpdatedDate);
             timestamp = parsedDate.getTime() / 1000;
           } catch (Exception e) {
             _log.error("Exception parsing LastUpdatedDate time: " + lastUpdatedDate);
@@ -119,19 +117,31 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
   return tripUpdatesFM;
   }
 
-  private List<StopTimeUpdate> buildStopTimeUpdateList(TripInfo trip) {
+  private Builder buildHeader() {
+    FeedMessage.Builder feedMessageBuilder = FeedMessage.newBuilder();
+    FeedHeader.Builder header = FeedHeader.newBuilder();
+    header.setTimestamp(System.currentTimeMillis()/1000);
+    header.setIncrementality(Incrementality.FULL_DATASET);
+    header.setGtfsRealtimeVersion(GtfsRealtimeConstants.VERSION);
+    feedMessageBuilder.setHeader(header);
+
+    return feedMessageBuilder;
+  }
+
+  private List<StopTimeUpdate> buildFrequencyStopTimeUpdateList(TripInfo trip) {
     List<StopTimeUpdate> stopTimeUpdateList = new ArrayList<StopTimeUpdate>();
     StopUpdatesList stopUpdateData = trip.getStopUpdates();
     List<StopUpdate> stopUpdates = stopUpdateData.getUpdates();
+    // filter on valid stops (drop tiplocs)
     if (stopUpdates != null && stopUpdates.size() > 0) {
-      List<StopUpdate> modStopUpdates = new ArrayList<>();
+      List<StopUpdate> filteredStopUpdates = new ArrayList<>();
       for (int i=0; i<stopUpdates.size(); ++i) {
         String stopId = stopUpdates.get(i).getStopId();
         if (_linkStopService.isValidLinkStop(stopId)) {
-          modStopUpdates.add(stopUpdates.get(i));
+          filteredStopUpdates.add(stopUpdates.get(i));
         }
       }
-      stopUpdates = modStopUpdates;
+      stopUpdates = filteredStopUpdates;
       String tripDirection = _linkTripService.getTripDirection(trip);
       List<StopTimeUpdate> dummyStopTimeUpdates =
           buildPseudoStopTimeUpdates(stopUpdates, tripDirection);
@@ -141,6 +151,13 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
             || stopUpdate.getStopId().isEmpty()) {
           continue;
         }    
+        
+        /* 
+         * TODO TODO TODO
+         * This code made the wrong assumption that we only want a single prediction for trip.
+         * Instead we want all future predictions per trip.
+         */
+        
         ArrivalTime arrivalTimeDetails = stopUpdate.getArrivalTime();
         if (arrivalTimeDetails != null) {
           String arrivalTime = arrivalTimeDetails.getActual();
@@ -210,10 +227,8 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
     String direction, String scheduleRelationship) {
     StopTimeUpdate.Builder stu = StopTimeUpdate.newBuilder();
     try {
-      DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-      Date parsedDate = df.parse(arrivalTime);
       StopTimeEvent.Builder ste = StopTimeEvent.newBuilder();
-      ste.setTime(parsedDate.getTime() / 1000);
+      ste.setTime(avlParseService.parseAvlTimeAsSeconds(arrivalTime));
       if (stopId != null) {
         stopId = _linkStopService.getGTFSStop(stopId, direction);
         if (stopId != null) {
@@ -261,10 +276,8 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         }
         if (arrivalTime != null) {
           try {
-            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-            Date parsedDate = df.parse(arrivalTime);
             int timeDelta = (targetOffset - baseOffset) * 1000;
-            Date adjustedDate = new Date(parsedDate.getTime() + timeDelta);
+            Date adjustedDate = new Date(avlParseService.parseAvlTimeAsMillis(arrivalTime) + timeDelta);
             
             // If the adjusted time is in the future or less than two minutes
             // ago, reset it to five minutes ago so it won't generate a
@@ -274,7 +287,7 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
               adjustedDate = new Date(System.currentTimeMillis() - 5 * 60 * 1000);
             }
               
-            adjustedTime = df.format(adjustedDate);
+            adjustedTime = avlParseService.formatAvlTime(adjustedDate);
           } catch (Exception e) {
             _log.error("Exception parsing arrival time: " + arrivalTime);
           }
@@ -282,6 +295,127 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
       }
     }
     return adjustedTime;
+  }
+
+  @Override
+  public FeedMessage buildScheduleFeedMessage(LinkAVLData linkAVLData) {
+    FeedMessage.Builder feedMessageBuilder = buildHeader();
+    
+    
+    TripInfoList tripInfoList = linkAVLData.getTrips();
+    List<TripInfo> trips = tripInfoList != null ? tripInfoList.getTrips() : null;
+    if (trips != null) {
+      for (TripInfo trip : trips) {
+        FeedEntity.Builder entity = FeedEntity.newBuilder();
+        entity.setId(trip.getVehicleId());
+        TripUpdate.Builder tu = TripUpdate.newBuilder();
+        VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
+        vd.setId(trip.getVehicleId());
+        tu.setVehicle(vd.build());
+        TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip);
+        if (td == null) {
+          _log.error("unmatched trip for trip " + trip.getTripId());
+          continue;
+        }
+        tu.setTrip(td);
+        
+        tu.addAllStopTimeUpdate(buildScheduleStopTimeUpdateList(trip, td.getTripId()));
+        tu.setTimestamp(avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate()));
+        // here we grab
+        
+        entity.setTripUpdate(tu);
+        feedMessageBuilder.addEntity(entity);
+      } // end for trips
+    } // end if trips != null
+    return feedMessageBuilder.build();
+
+  }
+
+  private Iterable<? extends StopTimeUpdate> buildScheduleStopTimeUpdateList(
+      TripInfo trip, String tripId) {
+    List<StopTimeUpdate> stopTimeUpdateList = new ArrayList<StopTimeUpdate>();
+    StopUpdatesList stopUpdateData = trip.getStopUpdates();
+    List<StopUpdate> stopUpdates = stopUpdateData.getUpdates();
+    // filter on valid stops (drop tiplocs)
+    if (stopUpdates != null && stopUpdates.size() > 0) {
+      List<StopUpdate> filteredStopUpdates = new ArrayList<>();
+      for (int i=0; i<stopUpdates.size(); ++i) {
+        String stopId = stopUpdates.get(i).getStopId();
+        if (_linkStopService.isValidLinkStop(stopId)) {
+          filteredStopUpdates.add(stopUpdates.get(i));
+        }
+      }
+      // we know tripId, lookup direction from bundle
+      
+      StopTimeUpdate stopTimeUpdate = findBestArrivalTimeUpdate(filteredStopUpdates, tripId);
+      if (stopTimeUpdate != null)
+        stopTimeUpdateList.add(stopTimeUpdate);
+    }
+    return stopTimeUpdateList;
+
+  }
+
+  /*
+   * We want a single prediction to represent the trip.  This is somewhat overly-
+   * copmlicated by the fact that early stops on the trip may not be served.  The
+   * logic is its the first estimated time after any actual times
+   */
+  private StopTimeUpdate findBestArrivalTimeUpdate(
+      List<StopUpdate> stopUpdates, String tripId) {
+    int lastActualIndex = findLastActualTimeIndex(stopUpdates);
+    int firstEmptyActualTimeIndex = findEstimatedActualTimeIndex(lastActualIndex, stopUpdates);
+    
+    if (firstEmptyActualTimeIndex >= stopUpdates.size()) {
+      _log.info("resetting estimated actual time index to end of list for trip " + tripId 
+          + " from " + firstEmptyActualTimeIndex);
+      firstEmptyActualTimeIndex = stopUpdates.size() -1 ;
+    }
+    
+    if (firstEmptyActualTimeIndex != -1 ) {
+      StopUpdate stopUpdate = stopUpdates.get(firstEmptyActualTimeIndex);
+      String tripDirection = _linkTripService.getTripDirectionFromTripId(tripId);
+      ArrivalTime arrival = stopUpdate.getArrivalTime();
+      String time = null;
+      if (arrival.getEstimated() != null)
+        time = arrival.getEstimated();
+      else {
+        _log.error("for tripId=" + tripId + " we did not find an estimated time.  Nothing to do");
+        return null;
+      }
+      return buildStopTimeUpdate(stopUpdate.getStopId(),
+          time, tripDirection, "");
+    }
+    _log.error("could not create stop time update for trip " + tripId);
+    return null;
+  }
+
+  private int findEstimatedActualTimeIndex(int lastActualIndex,
+      List<StopUpdate> stopUpdates) {
+    if (lastActualIndex >= 0 && lastActualIndex < stopUpdates.size()) {
+      return lastActualIndex+1;
+    }
+
+    // we didn't find an actual, use the first estimated
+    int index = 0;
+    for (StopUpdate u : stopUpdates) {
+      if (u.getArrivalTime().getEstimated() != null)
+        return index;
+      index++;
+    }
+    
+    // TODO should we fall back on scheduled?
+    return -1;
+  }
+
+  private int findLastActualTimeIndex(List<StopUpdate> stopUpdates) {
+    int last = -1;
+    int index = 0;
+    for (StopUpdate u : stopUpdates) {
+      if (u.getArrivalTime().getActual() != null)
+        last = index;
+      index++;
+    }
+    return last;
   }
 
 }

@@ -22,5 +22,7 @@ import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 public interface LinkTripService {
   public void updateTripsAndStops();
   public String getTripDirection(TripInfo trip);
-  public TripDescriptor buildTripDescriptor(TripInfo trip);
+  public TripDescriptor buildFrequencyTripDescriptor(TripInfo trip);
+  public TripDescriptor buildScheduleTripDescriptor(TripInfo trip);
+  public String getTripDirectionFromTripId(String tripId);
 }

@@ -24,14 +24,22 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
+import org.onebusaway.gtfs.model.AgencyAndId;
 import org.onebusaway.gtfs.model.calendar.LocalizedServiceId;
+import org.onebusaway.gtfs.model.calendar.ServiceDate;
 import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.transit_data_federation.services.ExtendedCalendarService;
+import org.onebusaway.transit_data_federation.services.blocks.BlockCalendarService;
+import org.onebusaway.transit_data_federation.services.blocks.BlockInstance;
+import org.onebusaway.transit_data_federation.services.blocks.BlockRunService;
+import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
+import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocationService;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.FrequencyEntry;
@@ -55,7 +63,35 @@ public class LinkTripServiceImpl implements LinkTripService {
   private LinkStopService _linkStopService;
   private List<TripEntry> tripEntries;
   private static String _linkRouteId;
+  private AvlParseService avlParseService = new AvlParseServiceImpl();
+  private BlockCalendarService _blockCalendarService;
+  private ScheduledBlockLocationService _blockLocationService;
+  private BlockRunService _blockRunService;
+  private String _defaultAgencyId = "40";
+  private String _agencyId;
+  private Integer _linkRouteKey = null;
+  private static Integer DEFAULT_LINK_ROUTE_KEY = 599;
+  private Integer getLinkRouteKey() {
+    if (_linkRouteKey == null) {
+      return DEFAULT_LINK_ROUTE_KEY;
+    }
+    return _linkRouteKey;
+  }
 
+  public void setLinkRouteKey(Integer linkRouteKey) {
+    _linkRouteKey = linkRouteKey;
+  }
+
+  public void setAgencyId(String agencyId) {
+    _agencyId = agencyId;
+  }
+  
+  public String getAgencyId() {
+    if (_agencyId == null)
+      return _defaultAgencyId;
+    return _agencyId;
+  }
+  
   public void setTimeToUpdateTripIds(long timeToUpdateTripIds) { // For testing
     this.timeToUpdateTripIds = timeToUpdateTripIds;
   }
@@ -69,10 +105,25 @@ public class LinkTripServiceImpl implements LinkTripService {
   public void setCalendarService(ExtendedCalendarService calendarService) {
     _calendarService = calendarService;
   }
+  
+  @Autowired
+  public void setScheduledBlockLocationService(ScheduledBlockLocationService blockLocationService) {
+    _blockLocationService = blockLocationService;
+  }
 
   @Autowired
   public void setLinkStopServiceImpl(LinkStopService linkStopService) {
     _linkStopService = linkStopService;
+  }
+  
+  @Autowired
+  public void setBlockCalendarService(BlockCalendarService blockCalendarService) {
+    _blockCalendarService = blockCalendarService;
+  }
+  
+  @Autowired
+  public void setBlockRunSerivce(BlockRunService blockRunService) {
+    _blockRunService = blockRunService;
   }
 
   public void setTripEntries(List<TripEntry> tripEntries) {  // For JUnit tests
@@ -181,7 +232,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     return direction;
   }
   
-  public TripDescriptor buildTripDescriptor(TripInfo trip) {
+  public TripDescriptor buildFrequencyTripDescriptor(TripInfo trip) {
     TripDescriptor.Builder td = TripDescriptor.newBuilder();
     String stopId = "";
     int scheduledTime = 0;
@@ -257,6 +308,113 @@ public class LinkTripServiceImpl implements LinkTripService {
     td.setRouteId(_linkRouteId);
     
     return td.build();
+  }
+
+  public TripDescriptor buildScheduleTripDescriptor(TripInfo trip) {
+    if (trip == null) return null;
+    TripDescriptor.Builder td = TripDescriptor.newBuilder();
+    String tripId = lookupTrip(getBlockRun(trip), findFirstStopTimeUpdate(trip.getStopUpdates()));
+
+    // unmatched trip, nothing we can do for now
+    // TODO: try harder to match trip including schedule shifting
+    if (tripId == null) return null;
+
+    td.setTripId(tripId);
+    return td.build();
+  }
+
+  private String getBlockRun(TripInfo trip) {
+//    return parseRun(trip.getVehicleId());
+    _log.info("tripId=" + trip.getTripId());
+    return parseRun(trip.getTripId());
+  }
+
+  private Long findFirstStopTimeUpdate(StopUpdatesList stopUpdates) {
+    if (stopUpdates == null || stopUpdates.getUpdates() == null || stopUpdates.getUpdates().isEmpty()) {
+      _log.error("no stopUpdates, nothing to do");
+      return null;
+    }
+    for (StopUpdate stopUpdate : stopUpdates.getUpdates()) {
+      if (stopUpdate.getArrivalTime() != null) {
+        // early stops may not be scheduled as trip may start mid way
+        if (stopUpdate.getArrivalTime().getScheduled() != null) {
+          Long time = avlParseService.parseAvlTimeAsMillis(stopUpdate.getArrivalTime().getScheduled());
+          if (time == null || time <= 0l) {
+            _log.error("could not parse time " + stopUpdate.getArrivalTime().getScheduled());
+          }
+          return avlParseService.parseAvlTimeAsMillis(stopUpdate.getArrivalTime().getScheduled());
+        }
+      }
+    }
+    _log.error("could not find valid arrival time");
+    return null;
+  }
+
+  // given a blockId find the active trip for the schedule time
+  String lookupTrip(String blockRunNumber, Long scheduleTime) {
+    _log.info("lookupTrip(" + blockRunNumber + ", " + scheduleTime + ")");
+    List<AgencyAndId> blockIds = lookupBlockIds(blockRunNumber);
+    if (blockIds == null) {
+      _log.error("no suitable blockIds for run=" + blockRunNumber);
+      return null;
+    }
+    BlockInstance instance = null;
+    
+    for (AgencyAndId blockId : blockIds) {
+      _log.info("found blockId=" + blockId);
+      if (scheduleTime == null) {
+        _log.error("missing scheduleTime for blockRunNumber=" + blockRunNumber);
+        continue;
+      }
+      //_blockStatusService.getRunningLateWindow() * 1000
+      //blockStatusService.getRunningEarlyWindow() * 1000
+      ServiceDate serviceDate = new ServiceDate();
+      // TODO this is making a big assumption -- see if we can improve it
+      instance = _blockCalendarService.getBlockInstance(blockId, serviceDate.getAsDate().getTime());
+      if (instance == null) {
+        _log.error("unmatched block=" + blockId + " for time= " + scheduleTime
+            + "(" + new Date(scheduleTime) + ")");
+        continue;
+      }
+      
+      int secondsIntoDay = (int) TimeUnit.SECONDS.convert(serviceDate.getAsDate().getTime() - scheduleTime, TimeUnit.MILLISECONDS);
+      
+      // we've found a block, now we need to search the block for the appropriate trip
+      // TODO -- not sure this is the most efficient way to determine trip
+      ScheduledBlockLocation blockLocation = _blockLocationService.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
+      return blockLocation.getActiveTrip().getTrip().getId().getId();
+    }
+    _log.error("fall throught for " + blockRunNumber + ", " + scheduleTime);
+    return null;
+  }
+
+
+  // given a block run lookup the possible block ids served by that run
+  List<AgencyAndId> lookupBlockIds(String blockRunNumber) {
+    List<AgencyAndId> agencyBlockIds = new ArrayList<AgencyAndId>();
+    
+    try {
+      List<Integer> blockIds = _blockRunService.getBlockIds(getLinkRouteKey(), Integer.parseInt(blockRunNumber));
+      if (blockIds == null) {
+        _log.error("missing blockId for " + getLinkRouteKey() + " / " + blockRunNumber);
+        return null;
+      }
+      for (Integer blockId : blockIds) {
+        if (blockId != null) {
+          agencyBlockIds.add(new AgencyAndId(getAgencyId(), blockId.toString()));
+        }
+      }
+    } catch (NumberFormatException nfe) {
+      _log.error("nfe for input=|" + blockRunNumber + "|");
+      return null;
+    }
+    return agencyBlockIds;
+  }
+
+  private String parseRun(String tripId) {
+    if (tripId.contains(":")) 
+      return tripId.substring(0, tripId.indexOf(":"));
+    return null;
   }
 
   private String getTripForStop(String stopId, String direction, int scheduledTime) {
@@ -362,10 +520,17 @@ public class LinkTripServiceImpl implements LinkTripService {
     List<BlockConfigurationEntry> blocks = trip.getBlock().getConfigurations();
     if (blocks.size() > 0) {
       List<FrequencyEntry> frequencies = blocks.get(0).getFrequencies();
-      if (frequencies.size() > 0) {
+      if (frequencies != null && frequencies.size() > 0) {
         startTime = frequencies.get(0).getStartTime();
-      }
+      } 
     }
     return startTime;
+  }
+
+  @Override
+  public String getTripDirectionFromTripId(String tripId) {
+    TripEntry trip = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
+    if (trip == null) return null;
+    return trip.getDirectionId();
   }
 }

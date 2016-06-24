@@ -34,5 +34,8 @@ public abstract class FeedBuilderServiceImpl implements FeedBuilderService {
   }
 
   @Override
-  public abstract FeedMessage buildFeedMessage(LinkAVLData linkAVLData);
+  public abstract FeedMessage buildFrequencyFeedMessage(LinkAVLData linkAVLData);
+  
+  @Override
+  public abstract FeedMessage buildScheduleFeedMessage(LinkAVLData linkAVLData);
 }

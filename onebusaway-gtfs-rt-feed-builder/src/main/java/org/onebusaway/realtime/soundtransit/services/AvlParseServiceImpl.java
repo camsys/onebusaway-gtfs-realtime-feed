@@ -16,10 +16,12 @@
 package org.onebusaway.realtime.soundtransit.services;
 
 import java.io.IOException;
+import java.util.Date;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.map.DeserializationConfig;
@@ -38,7 +40,8 @@ import org.slf4j.LoggerFactory;
 
 public class AvlParseServiceImpl implements AvlParseService {
   private static Logger _log = LoggerFactory.getLogger(AvlParseServiceImpl.class);
-
+  private SimpleDateFormat FORMATTER = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
+  
   @Override
   public LinkAVLData parseAVLFeed(String feedData) {
     LinkAVLData linkAVLData = new LinkAVLData();
@@ -52,14 +55,14 @@ public class AvlParseServiceImpl implements AvlParseService {
         _log.debug("Parsed AVL data: " + mapper.writeValueAsString(linkAVLData));
       }
     } catch (JsonParseException e) {
-      _log.error("JsonParseException trying to parse feed data.");
+      _log.error("JsonParseException trying to parse feed data.", e);
       parseFailed = true;
     } catch (JsonMappingException e) {
       _log.error("JsonMappingException: " + e.getMessage());
       _log.error("AVL feed: " + feedData);
       parseFailed = true;
     } catch (IOException e) {
-      _log.error("IOException trying to parse feed data.");
+      _log.error("IOException trying to parse feed data:", e);
       parseFailed = true;
     } catch (Exception e) {
       _log.error("Exception trying to parse feed data: " + e.getMessage());
@@ -137,23 +140,23 @@ public class AvlParseServiceImpl implements AvlParseService {
         return (int)(arrival1 - arrival2);
       }
       
-      arrival1 = parseArrivalTime(arrivalTime1.getActual());
-      arrival2 = parseArrivalTime(arrivalTime2.getActual());
+      arrival1 = parseAvlTimeAsMillis(arrivalTime1.getActual());
+      arrival2 = parseAvlTimeAsMillis(arrivalTime2.getActual());
       if (arrival1 > 0 && arrival2 > 0) {
         return (arrival1 > arrival2) ? 1 : 0;
       } else if (arrival1 != arrival2) {  // one is zero, the other isn't
         return (arrival1 > arrival2) ? 0 : 1;  // Non-zero has arrived already
       }
         
-      arrival1 = parseArrivalTime(arrivalTime1.getEstimated());
-      arrival2 = parseArrivalTime(arrivalTime2.getEstimated());
+      arrival1 = parseAvlTimeAsMillis(arrivalTime1.getEstimated());
+      arrival2 = parseAvlTimeAsMillis(arrivalTime2.getEstimated());
       if (arrival1 > 0 && arrival2 > 0) {
         return (arrival1 > arrival2) ? 1 : 0;
       } else if (arrival1 != arrival2) {
         return (arrival1 > arrival2) ? 0 : 1;
       }
-      arrival1 = parseArrivalTime(arrivalTime1.getScheduled());
-      arrival2 = parseArrivalTime(arrivalTime2.getScheduled());
+      arrival1 = parseAvlTimeAsMillis(arrivalTime1.getScheduled());
+      arrival2 = parseAvlTimeAsMillis(arrivalTime2.getScheduled());
       if (arrival1 > 0 && arrival2 > 0) {
         return (arrival1 > arrival2) ? 1 : 0;
       } else if (arrival1 != arrival2) {
@@ -164,21 +167,38 @@ public class AvlParseServiceImpl implements AvlParseService {
     }
   }
 
+  public long parseAvlTimeAsMillis(String arrivalTime) {
+    Date d = parseAvlTime(arrivalTime);
+    if (d == null) return 0L;
+    return d.getTime();  
+  }
+
+  public long parseAvlTimeAsSeconds(String arrivalTime) {
+    long l = parseAvlTimeAsMillis(arrivalTime);
+    if (l == 0L) return l;
+    return TimeUnit.SECONDS.convert(l, TimeUnit.MILLISECONDS);  
+  }
+
+  
   /*
    * This method will parse an ArrivalTime string and return 0 if it is null,
    * empty, or cannot be parsed, and will otherwise return the parsed time in
    * milliseconds.
    */
-  private long parseArrivalTime(String arrivalTime) {
-    long result = 0L;
+  public Date parseAvlTime(String arrivalTime) {
+    Date result = null;
     if (arrivalTime != null  && !arrivalTime.isEmpty()) {
-      SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
       try {
-        result = formatter.parse(arrivalTime).getTime();
+        result = FORMATTER.parse(arrivalTime);
       } catch (Exception e) {
-        result = 0L;
+        result = null;
       }
     }
     return result;
   }
+  
+  public String formatAvlTime(Date d) {
+    return FORMATTER.format(d);
+  }
+  
 }

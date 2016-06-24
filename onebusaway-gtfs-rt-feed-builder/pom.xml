@@ -22,17 +22,17 @@
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-transit-data-federation</artifactId>
-			<version>1.1.15.21-cs</version>
+			<version>1.1.15.29-cs-SNAPSHOT</version>
 		</dependency>
 	    <dependency>
 	      <groupId>org.onebusaway</groupId>
 	      <artifactId>onebusaway-container</artifactId>
-	      <version>1.1.15.21-cs</version>
+	      <version>1.1.15.29-cs-SNAPSHOT</version>
 	    </dependency>
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-util</artifactId>
-			<version>1.1.15.21-cs</version>
+			<version>1.1.15.29-cs-SNAPSHOT</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>slf4j-api</artifactId>
@@ -60,12 +60,12 @@
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-geospatial</artifactId>
-			<version>1.1.15.21-cs</version>
+			<version>1.1.15.29-cs-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-api-core</artifactId>
-			<version>1.1.15.21-cs</version>
+			<version>1.1.15.29-cs-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>

@@ -41,8 +41,7 @@ import com.google.transit.realtime.GtfsRealtime.FeedHeader.Incrementality;
 public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
   private static Logger _log = LoggerFactory.getLogger(VPFeedBuilderServiceImpl.class);
 
-  @Override
-  public FeedMessage buildFeedMessage(LinkAVLData linkAVLData) {
+  private FeedMessage buildFeedMessage(LinkAVLData linkAVLData) {
     // Update the list of trips (done only if the date has changed
     _linkTripService.updateTripsAndStops();
     
@@ -132,7 +131,7 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
           status = VehiclePosition.VehicleStopStatus.STOPPED_AT;
         }
         vp.setCurrentStatus(status);
-        TripDescriptor td = _linkTripService.buildTripDescriptor(trip);
+        TripDescriptor td = _linkTripService.buildFrequencyTripDescriptor(trip);
         vp.setTrip(td);
 
         FeedEntity.Builder entity = FeedEntity.newBuilder();
@@ -142,10 +141,21 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         ++vehiclePositionEntityCount;
       }
     }
-    
+      
     vehiclePositionsFM = feedMessageBuilder.build();
     _log.info("vehicle position updates: " + vehiclePositionEntityCount);
     return vehiclePositionsFM;
+    
+  }
+  
+  @Override
+  public FeedMessage buildFrequencyFeedMessage(LinkAVLData linkAVLData) {
+    return buildFeedMessage(linkAVLData);
+  }
+
+  @Override
+  public FeedMessage buildScheduleFeedMessage(LinkAVLData linkAVLData) {
+    return buildFeedMessage(linkAVLData);
   }
 
 }

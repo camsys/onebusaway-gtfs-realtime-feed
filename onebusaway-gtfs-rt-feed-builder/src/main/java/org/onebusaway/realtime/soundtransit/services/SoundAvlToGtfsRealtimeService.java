@@ -171,7 +171,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
         writeGtfsRealtimeOutput();
         _log.info("GTFS-rt feed updated");
       } catch (Exception ex) {
-        _log.error("Failed to refresh TransitData: " + ex.getMessage());
+        _log.error("Failed to refresh TransitData: " + ex.getMessage(), ex);
       }
     }
   }
@@ -181,7 +181,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     HttpURLConnection avlConnection = (HttpURLConnection) url.openConnection();
     avlConnection.setRequestProperty(
         "Accept",
-        "*/json");
+        "application/json");
     InputStream in = avlConnection.getInputStream();
     try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
       String nextLine = "";

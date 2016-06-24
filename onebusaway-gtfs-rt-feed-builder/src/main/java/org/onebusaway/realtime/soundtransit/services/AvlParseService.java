@@ -15,8 +15,14 @@
  */
 package org.onebusaway.realtime.soundtransit.services;
 
+import java.util.Date;
+
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 
 public interface AvlParseService {
   LinkAVLData parseAVLFeed(String dataFromAvl);
+  Date parseAvlTime(String arrivalTime);
+  long parseAvlTimeAsMillis(String arrivalTime);
+  long parseAvlTimeAsSeconds(String arrivalTime);
+  String formatAvlTime(Date d);
 }

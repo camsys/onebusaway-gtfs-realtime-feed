@@ -34,6 +34,7 @@ public class FeedServiceImpl implements FeedService {
   private FeedBuilderService _tuFeedBuilderServiceImpl;
   private FeedMessage _currentVehiclePositions;
   private FeedMessage _currentTripUpdates;
+  private boolean _isFrequencyBased = false;
 
   @Autowired
   public void setAvlParseService(AvlParseService avlParseService) {
@@ -52,6 +53,14 @@ public class FeedServiceImpl implements FeedService {
     _tuFeedBuilderServiceImpl = tuFeedBuilderServiceImpl;
   }
 
+  public void setFrequencySchedule(String isFrequency) {
+    _isFrequencyBased = "true".equalsIgnoreCase(isFrequency);
+  }
+  
+  public boolean isFrequencySchedule() {
+    return _isFrequencyBased;
+  }
+  
   @Override
   public FeedMessage getCurrentVehiclePositions() {
     return _currentVehiclePositions;
@@ -77,7 +86,12 @@ public class FeedServiceImpl implements FeedService {
   
   @Override
   public FeedMessage buildVPMessage(LinkAVLData linkAVLData) {
-    FeedMessage vehiclePositionsFM = _vpFeedBuilderServiceImpl.buildFeedMessage(linkAVLData);
+    FeedMessage vehiclePositionsFM = null;
+    if (isFrequencySchedule()) {
+      vehiclePositionsFM = _vpFeedBuilderServiceImpl.buildFrequencyFeedMessage(linkAVLData);
+    } else {
+      vehiclePositionsFM = _vpFeedBuilderServiceImpl.buildScheduleFeedMessage(linkAVLData);
+    }
     if (vehiclePositionsFM != null) {
       _currentVehiclePositions = vehiclePositionsFM;
     }
@@ -86,7 +100,12 @@ public class FeedServiceImpl implements FeedService {
 
   @Override
   public FeedMessage buildTUMessage(LinkAVLData linkAVLData) {
-    FeedMessage tripUpdatesFM = _tuFeedBuilderServiceImpl.buildFeedMessage(linkAVLData);
+    FeedMessage tripUpdatesFM = null;
+    if (this.isFrequencySchedule()) {
+      tripUpdatesFM = _tuFeedBuilderServiceImpl.buildFrequencyFeedMessage(linkAVLData);
+    } else {
+      tripUpdatesFM = _tuFeedBuilderServiceImpl.buildScheduleFeedMessage(linkAVLData);
+    }
     if (tripUpdatesFM != null) {
       _currentTripUpdates = tripUpdatesFM;
     }
