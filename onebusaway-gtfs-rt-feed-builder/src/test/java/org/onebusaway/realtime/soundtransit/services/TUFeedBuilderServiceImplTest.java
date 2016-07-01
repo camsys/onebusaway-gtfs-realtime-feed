@@ -22,6 +22,8 @@ import org.onebusaway.transit_data_federation.impl.blocks.BlockRunServiceImpl;
 import org.onebusaway.transit_data_federation.services.FederatedTransitDataBundle;
 import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
 import com.google.transit.realtime.GtfsRealtime.FeedMessage;
@@ -33,7 +35,6 @@ import static org.junit.Assert.*;
 
 public class TUFeedBuilderServiceImplTest {
 
-  
   
   private static final int LINK_ROUTE_KEY = 599;
   private static final String LINK_ROUTE_ID = "100479";
@@ -157,6 +158,12 @@ public class TUFeedBuilderServiceImplTest {
    assertTrue(td3.hasTripId());
    assertEquals("31625963", td3.getTripId());
    
+   
+   // trip "11: 390" is running early, verify the estimated and not the scheduled time comes through
+   FeedEntity e4 = findByVehicleId(feedMessage, "111:145");
+   assertNotNull(e4);
+   assertEquals(1466694620, e4.getTripUpdate().getStopTimeUpdateList().get(0).getArrival().getTime()); //2016-06-23T08:10:20.000-07:00
+   
    // validate the remaining updates and verify the estimated times are greater (in the future)
    // as compared to the lastUpdatedDate
    for (FeedEntity e : feedMessage.getEntityList()) {
@@ -167,6 +174,15 @@ public class TUFeedBuilderServiceImplTest {
    }
   }
 
+
+  private FeedEntity findByVehicleId(FeedMessage feedMessage, String search) {
+    for (FeedEntity fe : feedMessage.getEntityList()) {
+      if (search.equals(fe.getTripUpdate().getVehicle().getId())) {
+        return fe;
+      }
+    }
+    return null;
+  }
 
   private Map<String, String> buildTripDirectionMap() {
     Map<String, String> map = new HashMap<String, String>();
