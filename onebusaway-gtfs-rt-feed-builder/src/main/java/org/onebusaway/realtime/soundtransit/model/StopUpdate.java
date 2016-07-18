@@ -49,4 +49,9 @@ public class StopUpdate {
 	public void setArrivalTime(ArrivalTime arrivalTime) {
 		this.arrivalTime = arrivalTime;
 	}
+	public String toString() {
+	  return "{Stop " + stopId + " : "
+	      + (arrivalTime==null?"null arrivalTime":arrivalTime.toString())
+	      + "}";
+	}
 }

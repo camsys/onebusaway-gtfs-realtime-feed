@@ -2,6 +2,8 @@ package org.onebusaway.realtime.soundtransit.services;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -15,11 +17,14 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.onebusaway.gtfs.impl.GtfsRelationalDaoImpl;
 import org.onebusaway.gtfs.model.AgencyAndId;
+import org.onebusaway.gtfs.serialization.GtfsReader;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
 import org.onebusaway.transit_data_federation.impl.blocks.BlockRunServiceImpl;
 import org.onebusaway.transit_data_federation.services.FederatedTransitDataBundle;
+import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
 import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 import org.slf4j.Logger;
@@ -41,9 +46,24 @@ public class TUFeedBuilderServiceImplTest {
 
   private static final Map<String, Integer> blockTripStartTimeMap = new HashMap<String, Integer>(); 
   
+  private static final Map<String, Integer> nextStopTimeOffsetMap = new HashMap<String, Integer>();
+  
   @Before
-  public void setup() {
+  public void setup() throws Exception {
+    String gtfsDir = "KCMJune2016";
+    String gtfs = getClass().getResource(gtfsDir).getFile();
+    GtfsReader reader = new GtfsReader();
+    GtfsRelationalDaoImpl dao = new GtfsRelationalDaoImpl();
+    reader.setEntityStore(dao);
+    try {
+      reader.setInputLocation(new File(gtfs));
+      reader.run();
+    } catch (IOException e) {
+      fail("exception loading GTFS:" + e);
+    }
     
+    buildTripStartTimeMap(blockTripStartTimeMap);
+    buildNextStopTimeOffset(nextStopTimeOffsetMap);
   }
   
   @Test
@@ -57,11 +77,23 @@ public class TUFeedBuilderServiceImplTest {
     blockRunService.setBundle(bundle);
     blockRunService.setup();
     buildRunBlocks(blockRunService);
-    buildTripStartTimeMap(blockTripStartTimeMap);
+    
     final Map<String, String> tripDirectionMap = buildTripDirectionMap();
     
     LinkTripServiceImpl linkTripService = new LinkTripServiceImpl(){
 
+      ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime) {
+        ScheduledBlockLocation sbl = new ScheduledBlockLocation();
+        Integer offset = nextStopTimeOffsetMap.get(blockRunNumber + ":" + scheduleTime 
+            );
+        assertNotNull("need offset for blockRun=" + blockRunNumber 
+            + " and scheduleTime=" + scheduleTime
+            + " (" + new Date(scheduleTime) + ")",
+            offset);
+        sbl.setNextStopTimeOffset(offset);
+        return sbl;
+      }
+      
       // override lookupTrip to not require a bundle
       String lookupTrip(String blockRunStr, Long scheduleTime) {
         assertTrue("something is wrong with blockRunStr " + blockRunStr,
@@ -129,9 +161,12 @@ public class TUFeedBuilderServiceImplTest {
    // trip 31625833
    assertEquals(linkAVLData.getTrips().getTrips().get(0).getVehicleId(), e1.getId());
    assertTrue(e1.hasTripUpdate());
+   assertTrue(e1.getTripUpdate().hasDelay());
+   assertEquals(1, e1.getTripUpdate().getDelay());
    assertTrue(e1.getTripUpdate().hasTrip());
    assertEquals(new AvlParseServiceImpl().parseAvlTimeAsSeconds("2016-06-23T08:09:28.467-07:00"), e1.getTripUpdate().getTimestamp());
    TripDescriptor td1 = e1.getTripUpdate().getTrip();
+   
    assertEquals(TripDescriptor.ScheduleRelationship.SCHEDULED, td1.getScheduleRelationship());
    assertTrue(td1.hasTripId());
    assertEquals("31625833", td1.getTripId());
@@ -289,6 +324,23 @@ public class TUFeedBuilderServiceImplTest {
     
     blockRunService.addRunBlock(17, LINK_ROUTE_KEY, 4237431);
 
+  }
+
+  private void buildNextStopTimeOffset(
+      Map<String, Integer> nextstoptimeoffsetmap2) throws Exception {
+    
+    // 7:39 trip 40_31625834
+    nextStopTimeOffsetMap.put("1:1466692740000", computeOffset("2016-06-23 07:39:00"));
+  }
+
+  
+  private Integer computeOffset(String stopTimeStr) throws Exception {
+    return (int) (parseTime(stopTimeStr) - parseTime("2016-06-23 00:00:00")); 
+  }
+  
+  long parseTime(String dateStr) throws Exception {
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    return sdf.parse(dateStr).getTime();
   }
 
   /**

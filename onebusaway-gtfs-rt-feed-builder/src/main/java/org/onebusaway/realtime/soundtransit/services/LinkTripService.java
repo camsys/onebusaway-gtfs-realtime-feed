@@ -25,4 +25,5 @@ public interface LinkTripService {
   public TripDescriptor buildFrequencyTripDescriptor(TripInfo trip);
   public TripDescriptor buildScheduleTripDescriptor(TripInfo trip);
   public String getTripDirectionFromTripId(String tripId);
+  public Integer calculateDelay(TripInfo trip);
 }

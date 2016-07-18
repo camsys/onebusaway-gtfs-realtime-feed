@@ -40,4 +40,11 @@ public class ArrivalTime {
 	public void setEstimated(String estimated) {
 		this.estimated = estimated;
 	}
+	public String toString() {
+	  return "{"
+	      + "actual=" + actual 
+	      + ", scheduled=" + scheduled
+	      + ", estimated=" + estimated
+	      + "}";
+	}
 }

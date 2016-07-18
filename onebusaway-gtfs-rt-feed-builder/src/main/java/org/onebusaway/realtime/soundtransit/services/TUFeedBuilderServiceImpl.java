@@ -321,7 +321,10 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         
         tu.addAllStopTimeUpdate(buildScheduleStopTimeUpdateList(trip, td.getTripId()));
         tu.setTimestamp(avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate()));
-        // here we grab
+        // set schedule deviation so OBA plots position accurately
+        Integer delay = _linkTripService.calculateDelay(trip);
+        if (delay != null)
+          tu.setDelay(delay);
         
         entity.setTripUpdate(tu);
         feedMessageBuilder.addEntity(entity);
@@ -347,23 +350,22 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
       }
       // we know tripId, lookup direction from bundle
       
-      StopTimeUpdate stopTimeUpdate = findBestArrivalTimeUpdate(filteredStopUpdates, tripId);
-      if (stopTimeUpdate != null)
-        stopTimeUpdateList.add(stopTimeUpdate);
+      List<StopTimeUpdate> stopTimeUpdates = findArrivalTimeUpdates(filteredStopUpdates, tripId);
+      if (stopTimeUpdates != null)
+        stopTimeUpdateList.addAll(stopTimeUpdates);
     }
     return stopTimeUpdateList;
 
   }
 
   /*
-   * We want a single prediction to represent the trip.  This is somewhat overly-
-   * copmlicated by the fact that early stops on the trip may not be served.  The
-   * logic is its the first estimated time after any actual times
+   * return all stop time updates in the future
    */
-  private StopTimeUpdate findBestArrivalTimeUpdate(
+  private List<StopTimeUpdate> findArrivalTimeUpdates(
       List<StopUpdate> stopUpdates, String tripId) {
     int lastActualIndex = findLastActualTimeIndex(stopUpdates);
     int firstEmptyActualTimeIndex = findEstimatedActualTimeIndex(lastActualIndex, stopUpdates);
+    List<StopTimeUpdate> updates = new ArrayList<StopTimeUpdate>();
     
     if (firstEmptyActualTimeIndex >= stopUpdates.size()) {
       _log.info("resetting estimated actual time index to end of list for trip " + tripId 
@@ -372,21 +374,25 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
     }
     
     if (firstEmptyActualTimeIndex != -1 ) {
-      StopUpdate stopUpdate = stopUpdates.get(firstEmptyActualTimeIndex);
-      String tripDirection = _linkTripService.getTripDirectionFromTripId(tripId);
-      ArrivalTime arrival = stopUpdate.getArrivalTime();
-      String time = null;
-      if (arrival.getEstimated() != null)
-        time = arrival.getEstimated();
-      else {
-        _log.error("for tripId=" + tripId + " we did not find an estimated time.  Nothing to do");
-        return null;
+      for (int i = firstEmptyActualTimeIndex; i < stopUpdates.size(); i++) {
+        StopUpdate stopUpdate = stopUpdates.get(i);
+        String tripDirection = _linkTripService.getTripDirectionFromTripId(tripId);
+        ArrivalTime arrival = stopUpdate.getArrivalTime();
+        String time = null;
+        if (arrival.getEstimated() != null)
+          time = arrival.getEstimated();
+        else {
+          _log.error("for tripId=" + tripId + " we did not find an estimated time.  Nothing to do");
+          return null;
+        }
+        StopTimeUpdate stu = buildStopTimeUpdate(stopUpdate.getStopId(),
+            time, tripDirection, "");
+        if (stu != null) {
+          updates.add(stu);
+        }
       }
-      return buildStopTimeUpdate(stopUpdate.getStopId(),
-          time, tripDirection, "");
     }
-    _log.error("could not create stop time update for trip " + tripId);
-    return null;
+    return updates;
   }
 
   private int findEstimatedActualTimeIndex(int lastActualIndex,

@@ -42,8 +42,10 @@ import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLoca
 import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocationService;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.BlockStopTimeEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.FrequencyEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.ServiceIdActivation;
+import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 import org.slf4j.Logger;
@@ -314,7 +316,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     if (trip == null) return null;
     TripDescriptor.Builder td = TripDescriptor.newBuilder();
     String tripId = lookupTrip(getBlockRun(trip), findFirstStopTimeUpdate(trip.getStopUpdates()));
-
+    
     // unmatched trip, nothing we can do for now
     // TODO: try harder to match trip including schedule shifting
     if (tripId == null) return null;
@@ -350,8 +352,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     return null;
   }
 
-  // given a blockId find the active trip for the schedule time
-  String lookupTrip(String blockRunNumber, Long scheduleTime) {
+  ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime) {
     _log.info("lookupTrip(" + blockRunNumber + ", " + scheduleTime + ")");
     List<AgencyAndId> blockIds = lookupBlockIds(blockRunNumber);
     if (blockIds == null) {
@@ -382,10 +383,21 @@ public class LinkTripServiceImpl implements LinkTripService {
       // we've found a block, now we need to search the block for the appropriate trip
       // TODO -- not sure this is the most efficient way to determine trip
       ScheduledBlockLocation blockLocation = _blockLocationService.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
-      return blockLocation.getActiveTrip().getTrip().getId().getId();
+      if (blockLocation == null || blockLocation.getActiveTrip() == null && blockLocation.getActiveTrip().getTrip() == null)
+        continue;
+      return blockLocation;
     }
     _log.error("fall throught for " + blockRunNumber + ", " + scheduleTime);
     return null;
+    
+  }
+  
+  // given a blockId find the active trip for the schedule time
+  String lookupTrip(String blockRunNumber, Long scheduleTime) {
+    ScheduledBlockLocation blockLocation = lookupBlockLocation(blockRunNumber, scheduleTime);
+    if (blockLocation == null || blockLocation.getActiveTrip() == null && blockLocation.getActiveTrip().getTrip() == null)
+      return null;
+    return blockLocation.getActiveTrip().getTrip().getId().getId();
   }
 
 
@@ -448,8 +460,10 @@ public class LinkTripServiceImpl implements LinkTripService {
       }
       lastTrip = gtfsTripEntry;
     }
-    if (tripId.isEmpty()) {  // Assign it to the last trip
+    if (tripId.isEmpty() && tripEntries.size() > 1) {  // Assign it to the last trip
       tripId = tripEntries.get(tripEntries.size()-1).getId().getId();
+    } else if (tripId.isEmpty() && tripEntries.size() == 1) {
+      tripId = tripEntries.get(0).getId().getId();
     }
     return tripId;
   }
@@ -532,5 +546,66 @@ public class LinkTripServiceImpl implements LinkTripService {
     TripEntry trip = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
     if (trip == null) return null;
     return trip.getDirectionId();
+  }
+
+  @Override
+  public Integer calculateDelay(TripInfo trip) {
+    Long stopTimeUpdate = findFirstStopTimeUpdate(trip.getStopUpdates());
+    if (stopTimeUpdate == null) {
+      throw new IllegalStateException("valid stopTimeUpdate required");
+    }
+    ScheduledBlockLocation location = lookupBlockLocation(getBlockRun(trip), stopTimeUpdate);
+    if (location == null) {
+      throw new IllegalStateException("scheudled block location needed to be effective");
+      //return 0;
+    }
+    int scheduleTime = location.getNextStopTimeOffset();
+    Integer scheduleDeviation = computeScheduleDeviation(location, trip.getStopUpdates());
+    _log.error("dev=" + scheduleDeviation);
+    if (scheduleDeviation == null) {
+      throw new IllegalStateException("scheduleDeviation needed to be effective");
+    }
+    ServiceDate serviceDate = new ServiceDate(); // TODO
+    int predictedTime = (int) ((stopTimeUpdate - serviceDate.getAsDate().getTime()) / 1000);
+    return scheduleTime - predictedTime;
+  }
+
+  private Integer computeScheduleDeviation(ScheduledBlockLocation location,
+      StopUpdatesList stopUpdates) {
+      if (stopUpdates == null || stopUpdates.getUpdates() == null || stopUpdates.getUpdates().isEmpty()) {
+        _log.error("no stopUpdates, nothing to do");
+        return null;
+      }
+      
+      StopUpdate firstEstimatedStopUpdate = null;
+      for (StopUpdate stopUpdate : stopUpdates.getUpdates()) {
+        _log.info("stopUpdate=" + stopUpdate);
+        if (stopUpdate.getArrivalTime() != null) {
+          // early stops may not be scheduled as trip may start mid way
+          if (stopUpdate.getArrivalTime().getScheduled() != null) {
+            Long time = avlParseService.parseAvlTimeAsMillis(stopUpdate.getArrivalTime().getScheduled());
+            if (time == null || time <= 0l) {
+              _log.error("could not parse time " + stopUpdate.getArrivalTime().getScheduled());
+            }
+            Long scheduledStopTime = avlParseService.parseAvlTimeAsMillis(stopUpdate.getArrivalTime().getScheduled());
+            if (stopUpdate.getArrivalTime().getActual() == null) {
+              _log.info("found null actual at arrivalTime=" + stopUpdate.getArrivalTime());
+              firstEstimatedStopUpdate = stopUpdate;
+              break;
+            }
+          }
+        }
+        firstEstimatedStopUpdate = stopUpdate;
+      }
+      if (firstEstimatedStopUpdate == null) {
+        _log.error("could not find stopUpdate!");
+        return null;
+      }
+      
+      ArrivalTime arrivalTime = firstEstimatedStopUpdate.getArrivalTime();
+      long scheduled = avlParseService.parseAvlTimeAsMillis(arrivalTime.getScheduled());
+      long actual = avlParseService.parseAvlTimeAsMillis(arrivalTime.getActual());
+      return (int) ((scheduled - actual)/1000);
+      
   }
 }
