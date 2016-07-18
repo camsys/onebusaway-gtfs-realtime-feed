@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +20,8 @@ import org.junit.Test;
 import org.mockito.Mockito;
 import org.onebusaway.gtfs.impl.GtfsRelationalDaoImpl;
 import org.onebusaway.gtfs.model.AgencyAndId;
+import org.onebusaway.gtfs.model.StopTime;
+import org.onebusaway.gtfs.model.Trip;
 import org.onebusaway.gtfs.serialization.GtfsReader;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
@@ -43,17 +46,21 @@ public class TUFeedBuilderServiceImplTest {
   
   private static final int LINK_ROUTE_KEY = 599;
   private static final String LINK_ROUTE_ID = "100479";
-
+  private static final GtfsRelationalDaoImpl dao = new GtfsRelationalDaoImpl();
   private static final Map<String, Integer> blockTripStartTimeMap = new HashMap<String, Integer>(); 
   
   private static final Map<String, Integer> nextStopTimeOffsetMap = new HashMap<String, Integer>();
   
   @Before
   public void setup() throws Exception {
+    buildTripStartTimeMap(blockTripStartTimeMap);
+    buildNextStopTimeOffset(nextStopTimeOffsetMap);
+
+    
     String gtfsDir = "KCMJune2016";
     String gtfs = getClass().getResource(gtfsDir).getFile();
     GtfsReader reader = new GtfsReader();
-    GtfsRelationalDaoImpl dao = new GtfsRelationalDaoImpl();
+    
     reader.setEntityStore(dao);
     try {
       reader.setInputLocation(new File(gtfs));
@@ -62,8 +69,6 @@ public class TUFeedBuilderServiceImplTest {
       fail("exception loading GTFS:" + e);
     }
     
-    buildTripStartTimeMap(blockTripStartTimeMap);
-    buildNextStopTimeOffset(nextStopTimeOffsetMap);
   }
   
   @Test
@@ -102,12 +107,13 @@ public class TUFeedBuilderServiceImplTest {
         assertNotNull("expected block for run " + blockRunStr, blockIds);
         assertTrue(blockIds.size() > 0);
         String debugBlockId = "";
-        Integer trip = null;
+        String tripId = null;
         for (AgencyAndId agencyBlockId : blockIds) {
           String blockId = agencyBlockId.getId();
           debugBlockId += blockId + ", ";
-          trip = blockTripStartTimeMap.get(blockId + ":" + scheduleTime);
-          if (trip != null) break; // we found it
+          tripId = verifyTrip(blockId, scheduleTime);
+          
+          if (tripId != null) break; // we found it
         }
 
         // make sure we always find a trip from the above map
@@ -115,10 +121,46 @@ public class TUFeedBuilderServiceImplTest {
             + "blockRun=" + blockRunStr 
             + " and scheduleTime=" 
             + scheduleTime + " (" + new Date(scheduleTime) + ")"
-            , trip);
-        return trip.toString();
+            , tripId);
+        return tripId.toString();
       }
       
+      private String verifyTrip (String blockId, Long scheduleTime) {
+        
+        Integer testTrip = blockTripStartTimeMap.get(blockId + ":" + scheduleTime);
+        assertNotNull(testTrip);
+        AgencyAndId gtfsTripId = findBestTrip(blockId, scheduleTime);
+        assertEquals(testTrip.toString(), gtfsTripId.getId());
+        return gtfsTripId.getId();
+      }
+
+      private AgencyAndId findBestTrip(String blockId, Long scheduleTime) {
+        Trip bestTrip = null;
+        int i = 0;
+        for (Trip trip : dao.getAllTrips()) {
+          i++;
+          if (trip.getBlockId() != null && trip.getBlockId().equals(blockId)) {
+            bestTrip = trip;
+          }
+        }
+        if (bestTrip == null) {
+          throw new IllegalStateException("blockId " + blockId + " does not exist in GTFS with " + i + " trips");
+        }
+        StopTime bestStopTime = null;
+        for (StopTime st : dao.getAllStopTimes()) {
+          if (st.getTrip().equals(bestTrip)) {
+            if (bestStopTime == null) {
+              bestStopTime = st;
+              // here we make sure there are actually stoptimes for that trip
+              return bestTrip.getId(); // TODO do we need to compare scheduleTimes?
+            } else {
+            }
+          }
+        }
+        throw new IllegalStateException("no stop times for trip=" + bestTrip);
+//        return null;
+      }
+
       public String getTripDirectionFromTripId(String tripId) {
         String direction = tripDirectionMap.get(tripId);
         assertNotNull("missing direction for tripId=" + tripId, direction);
