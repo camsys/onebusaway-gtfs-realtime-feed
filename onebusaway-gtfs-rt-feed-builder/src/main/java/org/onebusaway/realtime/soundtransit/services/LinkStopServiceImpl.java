@@ -194,8 +194,10 @@ public class LinkStopServiceImpl implements LinkStopService {
     if (nbStopCt == 0) {
       _log.error("No northbound stops found for this route");
     }
+    if (sbTrip != null && sbTrip.getId() != null)
     _log.info("Southbound trip " + sbTrip.getId().toString() + " has "
         + sbStopCt + " stops.");
+    if (nbTrip != null && nbTrip.getId() != null)
     _log.info("Northbound trip " + nbTrip.getId().toString() + " has "
         + nbStopCt + " stops.");
     List<StopTimeEntry> sbStopTimeEntries = sbTrip.getStopTimes();

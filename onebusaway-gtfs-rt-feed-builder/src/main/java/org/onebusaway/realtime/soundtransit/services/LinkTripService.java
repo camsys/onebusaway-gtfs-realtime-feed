@@ -15,6 +15,7 @@
  */
 package org.onebusaway.realtime.soundtransit.services;
 
+import org.onebusaway.gtfs.model.calendar.ServiceDate;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 
 import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
@@ -23,7 +24,7 @@ public interface LinkTripService {
   public void updateTripsAndStops();
   public String getTripDirection(TripInfo trip);
   public TripDescriptor buildFrequencyTripDescriptor(TripInfo trip);
-  public TripDescriptor buildScheduleTripDescriptor(TripInfo trip);
+  public TripDescriptor buildScheduleTripDescriptor(TripInfo trip, ServiceDate serviceDate);
   public String getTripDirectionFromTripId(String tripId);
   public Integer calculateDelay(TripInfo trip);
 }

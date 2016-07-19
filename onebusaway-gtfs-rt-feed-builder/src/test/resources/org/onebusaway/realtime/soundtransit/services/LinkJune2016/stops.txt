@@ -1,0 +1,31 @@
+stop_id,stop_name,stop_lat,stop_lon,zone_id,stop_timezone
+1108,Westlake Tunnel Station & Pine St - 3rd 4th & 5th Avenue - Bay C,47.611393,-122.337509,21,America/Los_Angeles
+1121,Westlake Station & Pine St - 3rd 4th & 5th Avenue - Bay A,47.611801,-122.335823,21,America/Los_Angeles
+455,University St Stn & 3rd Av - Seneca Or University Street - Bay C,47.607246,-122.335754,21,America/Los_Angeles
+501,Pioneer Sq Stn & 3rd Av - James - Bay C,47.602138,-122.331055,21,America/Los_Angeles
+532,Pioneer Sqr Stn & 3rd Av - James - Bay A,47.603199,-122.331581,21,America/Los_Angeles
+55578,Rainier Beach Stn Rail & Mlk Jr Wy S/S Henderson St,47.522953,-122.279083,78,America/Los_Angeles
+55656,Othello Station Rail & Mlk Jr Wy S/S Othello St,47.538483,-122.281677,77,America/Los_Angeles
+55778,Columbia City Stn Rail & Mlk Jr Wy S/S Alaska St,47.560280,-122.292892,76,America/Los_Angeles
+55860,Mount Baker Station Rail & Rainier Av S/S Mcclellan St,47.576992,-122.297867,75,America/Los_Angeles
+55949,Mount Baker Station Rail & Rainier Av S/S Mcclellan St,47.576439,-122.297737,75,America/Los_Angeles
+56039,Columbia City Stn Rail & Mlk Jr Wy S/S Alaska St,47.558952,-122.292343,76,America/Los_Angeles
+56159,Othello Station Rail & Mlk Jr Wy S/S Othello St,47.537529,-122.281471,77,America/Los_Angeles
+56173,Rainier Beach Stn Rail & Mlk Jr Wy S/S Henderson St,47.522266,-122.279587,78,America/Los_Angeles
+565,Univ St Stn & 3rd Av - Seneca Or University Street - Bay A,47.608246,-122.336166,21,America/Los_Angeles
+621,Intl District Stn & S Jackson St - 5th Avenue S - Bay A,47.598450,-122.327820,21,America/Los_Angeles
+623,Intl Distr Stn & S Jackson St - 5th Avenue S - Bay C,47.597664,-122.328217,21,America/Los_Angeles
+99101,Stadium Stn Rail & SODO Busway/S Royal Brougham Way,47.591812,-122.327354,72,America/Los_Angeles
+99111,SODO Stn Rail & SODO Busway/S Lander St,47.579952,-122.327522,73,America/Los_Angeles
+99121,Beacon Hill Stn Tun & Beacon Av S/S Lander St,47.579124,-122.311279,74,America/Los_Angeles
+99240,Beacon Hill Stn Tun & Beacon Av S/S Lander St,47.579678,-122.311401,74,America/Los_Angeles
+99256,SODO Stn Rail & SODO Busway/S Lander St,47.580589,-122.327263,73,America/Los_Angeles
+99260,Stadium Stn Rail & SODO Busway/S Royal Brougham Way,47.592281,-122.326988,72,America/Los_Angeles
+99603,Capitol Hill Link Station,47.619629,-122.320038,82,America/Los_Angeles
+99604,UW / Husky Stadium Link Station,47.649704,-122.303886,81,America/Los_Angeles
+99605,UW / Husky Stadium Link Station,47.649704,-122.303520,81,America/Los_Angeles
+99610,Capitol Hill Link Station,47.619560,-122.320389,82,America/Los_Angeles
+99900,Tukwila Intl Blvd Stn Rail & Tukwila Intl Blvd S/S 154th St,47.464272,-122.288399,79,America/Los_Angeles
+99903,Seatac/Airport Stn Rail & Intl Blvd S/S 176 St,47.444939,-122.296677,80,America/Los_Angeles
+99904,Seatac/Airport Stn Rail & Intl Blvd S/S 176 St,47.444931,-122.297028,80,America/Los_Angeles
+99905,Tukwila Intl Blvd Stn Rail & Tukwila Intl Blvd S/S 154th St,47.463924,-122.288002,79,America/Los_Angeles

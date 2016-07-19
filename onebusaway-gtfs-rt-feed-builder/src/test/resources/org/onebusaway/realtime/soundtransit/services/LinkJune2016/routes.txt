@@ -1,0 +1,2 @@
+agency_id,route_id,route_short_name,route_long_name,route_type,route_desc,route_url
+ST,100479,LINK,,0,LINK to Sea-Tac,http://www.soundtransit.org/Schedules/ST-Express-Bus/599

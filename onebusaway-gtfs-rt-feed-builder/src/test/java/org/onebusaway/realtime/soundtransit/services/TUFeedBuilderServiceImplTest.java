@@ -1,77 +1,50 @@
 package org.onebusaway.realtime.soundtransit.services;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import org.aspectj.runtime.internal.cflowstack.ThreadCounterImpl11;
-import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.onebusaway.gtfs.impl.GtfsRelationalDaoImpl;
 import org.onebusaway.gtfs.model.AgencyAndId;
+import org.onebusaway.gtfs.model.Block;
 import org.onebusaway.gtfs.model.StopTime;
 import org.onebusaway.gtfs.model.Trip;
-import org.onebusaway.gtfs.serialization.GtfsReader;
+import org.onebusaway.gtfs.model.calendar.ServiceDate;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
-import org.onebusaway.realtime.soundtransit.model.StopOffset;
 import org.onebusaway.transit_data_federation.impl.blocks.BlockRunServiceImpl;
 import org.onebusaway.transit_data_federation.services.FederatedTransitDataBundle;
 import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
 import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
 import com.google.transit.realtime.GtfsRealtime.FeedMessage;
 import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
-import com.google.transit.realtime.GtfsRealtime.TripUpdate;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
-
-import static org.junit.Assert.*;
 
 public class TUFeedBuilderServiceImplTest {
 
-  
-  private static final int LINK_ROUTE_KEY = 599;
   private static final String LINK_ROUTE_ID = "100479";
-  private static final GtfsRelationalDaoImpl dao = new GtfsRelationalDaoImpl();
-  private static final Map<String, Integer> blockTripStartTimeMap = new HashMap<String, Integer>(); 
   
-  private static final Map<String, Integer> nextStopTimeOffsetMap = new HashMap<String, Integer>();
+  private LinkGtfsAdaptor ga;
   
   @Before
   public void setup() throws Exception {
-    buildTripStartTimeMap(blockTripStartTimeMap);
-    buildNextStopTimeOffset(nextStopTimeOffsetMap);
-
-    
-    String gtfsDir = "KCMJune2016";
-    String gtfs = getClass().getResource(gtfsDir).getFile();
-    GtfsReader reader = new GtfsReader();
-    
-    reader.setEntityStore(dao);
-    try {
-      reader.setInputLocation(new File(gtfs));
-      reader.run();
-    } catch (IOException e) {
-      fail("exception loading GTFS:" + e);
-    }
-    
+    // this data is based off of KCM "6/16/2016  2:31 PM     12678719 google_daily_transit.zip"
+    ga = new LinkGtfsAdaptor("LinkJune2016", "20160623");
   }
   
   @Test
+  // TODO:  this test has an ordering issue with java7, works with java8
   public void testBuildScheduleFeedMessage() throws ClassNotFoundException, IOException {
     AvlParseService avlParseService = new AvlParseServiceImpl();
     
@@ -83,24 +56,30 @@ public class TUFeedBuilderServiceImplTest {
     blockRunService.setup();
     buildRunBlocks(blockRunService);
     
-    final Map<String, String> tripDirectionMap = buildTripDirectionMap();
-    
     LinkTripServiceImpl linkTripService = new LinkTripServiceImpl(){
 
-      ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime) {
+      ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, ServiceDate serviceDate) {
+        int scheduleOffset = (int) (scheduleTime - ga.getServiceDate().getAsDate().getTime())/1000;
+        Block b = ga.getBlockForRun(blockRunNumber, serviceDate);
+        assertNotNull(b);
+        Trip trip = ga.getTripByBlockId("" + b.getId());
+        int lastArrivalOffset = Integer.MAX_VALUE;
+        for (StopTime st : ga.getStopTimesForTripId(trip.getId().getId())) {
+          if (st.isArrivalTimeSet() 
+              && st.getArrivalTime() < lastArrivalOffset 
+              && st.getArrivalTime() < scheduleOffset) {
+            lastArrivalOffset = st.getArrivalTime();
+          }
+        }
+        
         ScheduledBlockLocation sbl = new ScheduledBlockLocation();
-        Integer offset = nextStopTimeOffsetMap.get(blockRunNumber + ":" + scheduleTime 
-            );
-        assertNotNull("need offset for blockRun=" + blockRunNumber 
-            + " and scheduleTime=" + scheduleTime
-            + " (" + new Date(scheduleTime) + ")",
-            offset);
-        sbl.setNextStopTimeOffset(offset);
+        sbl.setNextStopTimeOffset(lastArrivalOffset);
         return sbl;
       }
       
+
       // override lookupTrip to not require a bundle
-      String lookupTrip(String blockRunStr, Long scheduleTime) {
+      String lookupTripByRunId(String blockRunStr, Long scheduleTime, ServiceDate serviceDate) {
         assertTrue("something is wrong with blockRunStr " + blockRunStr,
             !scheduleTime.equals(new Long(0L)));
         List<AgencyAndId> blockIds = lookupBlockIds(blockRunStr);
@@ -111,8 +90,7 @@ public class TUFeedBuilderServiceImplTest {
         for (AgencyAndId agencyBlockId : blockIds) {
           String blockId = agencyBlockId.getId();
           debugBlockId += blockId + ", ";
-          tripId = verifyTrip(blockId, scheduleTime);
-          
+          tripId = verifyTrip(blockId, scheduleTime, serviceDate);
           if (tripId != null) break; // we found it
         }
 
@@ -125,46 +103,11 @@ public class TUFeedBuilderServiceImplTest {
         return tripId.toString();
       }
       
-      private String verifyTrip (String blockId, Long scheduleTime) {
+      private String verifyTrip(String blockId, Long scheduleTime, ServiceDate serviceDate) {
         
-        Integer testTrip = blockTripStartTimeMap.get(blockId + ":" + scheduleTime);
-        assertNotNull(testTrip);
-        AgencyAndId gtfsTripId = findBestTrip(blockId, scheduleTime);
-        assertEquals(testTrip.toString(), gtfsTripId.getId());
+        AgencyAndId gtfsTripId = ga.findBestTrip(blockId, scheduleTime, serviceDate);
+        assertNotNull(gtfsTripId);
         return gtfsTripId.getId();
-      }
-
-      private AgencyAndId findBestTrip(String blockId, Long scheduleTime) {
-        Trip bestTrip = null;
-        int i = 0;
-        for (Trip trip : dao.getAllTrips()) {
-          i++;
-          if (trip.getBlockId() != null && trip.getBlockId().equals(blockId)) {
-            bestTrip = trip;
-          }
-        }
-        if (bestTrip == null) {
-          throw new IllegalStateException("blockId " + blockId + " does not exist in GTFS with " + i + " trips");
-        }
-        StopTime bestStopTime = null;
-        for (StopTime st : dao.getAllStopTimes()) {
-          if (st.getTrip().equals(bestTrip)) {
-            if (bestStopTime == null) {
-              bestStopTime = st;
-              // here we make sure there are actually stoptimes for that trip
-              return bestTrip.getId(); // TODO do we need to compare scheduleTimes?
-            } else {
-            }
-          }
-        }
-        throw new IllegalStateException("no stop times for trip=" + bestTrip);
-//        return null;
-      }
-
-      public String getTripDirectionFromTripId(String tripId) {
-        String direction = tripDirectionMap.get(tripId);
-        assertNotNull("missing direction for tripId=" + tripId, direction);
-        return direction;
       }
     };
     
@@ -204,18 +147,20 @@ public class TUFeedBuilderServiceImplTest {
    assertEquals(linkAVLData.getTrips().getTrips().get(0).getVehicleId(), e1.getId());
    assertTrue(e1.hasTripUpdate());
    assertTrue(e1.getTripUpdate().hasDelay());
-   assertEquals(1, e1.getTripUpdate().getDelay());
+   assertEquals(0, e1.getTripUpdate().getDelay());
    assertTrue(e1.getTripUpdate().hasTrip());
    assertEquals(new AvlParseServiceImpl().parseAvlTimeAsSeconds("2016-06-23T08:09:28.467-07:00"), e1.getTripUpdate().getTimestamp());
    TripDescriptor td1 = e1.getTripUpdate().getTrip();
    
    assertEquals(TripDescriptor.ScheduleRelationship.SCHEDULED, td1.getScheduleRelationship());
-   assertTrue(td1.hasTripId());
-   assertEquals("31625833", td1.getTripId());
    assertTrue(e1.getTripUpdate().hasVehicle());
    assertEquals("134:138", e1.getTripUpdate().getVehicle().getId());
-   // we only want one update
-   assertEquals(1, e1.getTripUpdate().getStopTimeUpdateCount());
+
+   assertTrue(td1.hasTripId());
+   // tripId "1: 6" has run of 1 and via block.txt has block of 4237399
+   assertEquals("31625507", td1.getTripId());
+   // we want multiple updates!
+   assertEquals(3, e1.getTripUpdate().getStopTimeUpdateCount());
    StopTimeUpdate e1st1 = e1.getTripUpdate().getStopTimeUpdateList().get(0);
    assertTrue(e1st1.hasArrival());
    // update needs to be in seconds, not millis!
@@ -227,13 +172,26 @@ public class TUFeedBuilderServiceImplTest {
    FeedEntity e2 = feedMessage.getEntity(1);
    TripDescriptor td2 = e2.getTripUpdate().getTrip();
    assertTrue(td2.hasTripId());
-   assertEquals("31625834", td2.getTripId());
+   assertEquals("31625505", td2.getTripId());
    
    // third entity
    FeedEntity e3 = feedMessage.getEntity(2);
    TripDescriptor td3 = e3.getTripUpdate().getTrip();
    assertTrue(td3.hasTripId());
-   assertEquals("31625963", td3.getTripId());
+   assertEquals("31625506", td3.getTripId());
+   assertTrue(e3.hasTripUpdate());
+   assertTrue(e3.getTripUpdate().hasDelay());
+   /*
+   "StopId": "SEA_PLAT",
+   "StationName": "Airport Station",
+   "Frequency": "0",
+   "ArrivalTime": {
+     "Actual": null,
+     "Scheduled": "2016-06-23T08:11:00.000-07:00",
+     "Estimated": "2016-06-23T08:10:20.000-07:00"
+   }
+   */
+   assertEquals(td3.getTripId() + " has invalid delay", -40, e3.getTripUpdate().getDelay());
    
    
    // trip "11: 390" is running early, verify the estimated and not the scheduled time comes through
@@ -244,8 +202,6 @@ public class TUFeedBuilderServiceImplTest {
    // validate the remaining updates and verify the estimated times are greater (in the future)
    // as compared to the lastUpdatedDate
    for (FeedEntity e : feedMessage.getEntityList()) {
-     // only 1 update for each entity
-     assertEquals(1, e.getTripUpdate().getStopTimeUpdateCount());
      StopTimeUpdate stu11 = e1.getTripUpdate().getStopTimeUpdateList().get(0);
      assertTrue(stu11.getArrival().getTime() > e.getTripUpdate().getTimestamp());
    }
@@ -261,123 +217,16 @@ public class TUFeedBuilderServiceImplTest {
     return null;
   }
 
-  private Map<String, String> buildTripDirectionMap() {
-    Map<String, String> map = new HashMap<String, String>();
-    map.put("31625833", "0");
-    map.put("31625834", "0");
-    map.put("31625835", "0");
-    map.put("31625844", "0");
-    map.put("31625845", "0");
-    map.put("31625847", "0");
-    
-    // 31625936 is first "1"
-    
-    map.put("31625944", "1");
-    map.put("31625945", "1");
-    map.put("31625946", "1");
-    map.put("31625954", "1");
-    map.put("31625955", "1");
-    map.put("31625963", "1");
-    map.put("31626060", "1");
-    
-    // 31626070 back to "0"
-    
-    map.put("31626079", "0");
-    map.put("31626111", "0");
-    return map;
-  }
-
-  private void buildTripStartTimeMap(
-      Map<String, Integer> blocktripstarttimemap2) {
-    blockTripStartTimeMap.put("4237414:1466694600000", 31625834);
-    blockTripStartTimeMap.put("4237416:1466692740000", 31625833);
-    blockTripStartTimeMap.put("4237419:1466692020000", 31625963);
-    blockTripStartTimeMap.put("4237429:1466692380000", 31626079); // start of trip
-    blockTripStartTimeMap.put("4237410:1466693820000", 31625845);
-    blockTripStartTimeMap.put("4237428:1466694540000", 31626111); //first actual is missing
-    blockTripStartTimeMap.put("4237411:1466694060000", 31625847);
-    blockTripStartTimeMap.put("4237413:1466694060000", 31625945);
-    blockTripStartTimeMap.put("4237431:1466694420000", 31626060);
-    blockTripStartTimeMap.put("4237407:1466693100000", 31625844);
-    blockTripStartTimeMap.put("4237417:1466693460000", 31625835);
-    blockTripStartTimeMap.put("4237417:1466694180000", 31625835); // duplicate trip!
-    blockTripStartTimeMap.put("4237420:1466694090000", 31625944);
-    blockTripStartTimeMap.put("4237409:1466694120000", 31625954);
-    blockTripStartTimeMap.put("4237418:1466694240000", 31625955);
-    blockTripStartTimeMap.put("4237415:1466694060000", 31625946);
-  }
 
   private void buildRunBlocks(BlockRunServiceImpl blockRunService) {
-    // this data is based off of KCM "6/16/2016  2:31 PM     12678719 google_daily_transit.zip"
-    blockRunService.addRunBlock(1, LINK_ROUTE_KEY, 4237386);
-    blockRunService.addRunBlock(1, LINK_ROUTE_KEY, 4237399);
-    blockRunService.addRunBlock(1, LINK_ROUTE_KEY, 4237416);
-
-    blockRunService.addRunBlock(2, LINK_ROUTE_KEY, 4237387);
-    blockRunService.addRunBlock(2, LINK_ROUTE_KEY, 4237398);
-    blockRunService.addRunBlock(2, LINK_ROUTE_KEY, 4237407);
-
-    blockRunService.addRunBlock(3, LINK_ROUTE_KEY, 4237391);
-    blockRunService.addRunBlock(3, LINK_ROUTE_KEY, 4237405);
-    blockRunService.addRunBlock(3, LINK_ROUTE_KEY, 4237417);
-
-    blockRunService.addRunBlock(4, LINK_ROUTE_KEY, 4237391);
-    blockRunService.addRunBlock(4, LINK_ROUTE_KEY, 4237405);
-    blockRunService.addRunBlock(4, LINK_ROUTE_KEY, 4237417);
     
-    blockRunService.addRunBlock(5, LINK_ROUTE_KEY, 4237395);
-    blockRunService.addRunBlock(5, LINK_ROUTE_KEY, 4237396);
-    blockRunService.addRunBlock(5, LINK_ROUTE_KEY, 4237408);
-    
-    blockRunService.addRunBlock(6, LINK_ROUTE_KEY, 4237388);
-    blockRunService.addRunBlock(6, LINK_ROUTE_KEY, 4237397);
-    blockRunService.addRunBlock(6, LINK_ROUTE_KEY, 4237420);
-
-    blockRunService.addRunBlock(7, LINK_ROUTE_KEY, 4237389);
-    blockRunService.addRunBlock(7, LINK_ROUTE_KEY, 4237400);
-    blockRunService.addRunBlock(7, LINK_ROUTE_KEY, 4237409);
-
-    blockRunService.addRunBlock(8, LINK_ROUTE_KEY, 4237390);
-    blockRunService.addRunBlock(8, LINK_ROUTE_KEY, 4237402);
-    blockRunService.addRunBlock(8, LINK_ROUTE_KEY, 4237418);
-
-    blockRunService.addRunBlock(9, LINK_ROUTE_KEY, 4237394);
-    blockRunService.addRunBlock(9, LINK_ROUTE_KEY, 4237403);
-    blockRunService.addRunBlock(9, LINK_ROUTE_KEY, 4237415);
-
-    
-    blockRunService.addRunBlock(10, LINK_ROUTE_KEY, 4237392);
-    blockRunService.addRunBlock(10, LINK_ROUTE_KEY, 4237406);
-    blockRunService.addRunBlock(10, LINK_ROUTE_KEY, 4237414);
-    
-    blockRunService.addRunBlock(11, LINK_ROUTE_KEY, 4237393);
-    blockRunService.addRunBlock(11, LINK_ROUTE_KEY, 4237404);
-    blockRunService.addRunBlock(11, LINK_ROUTE_KEY, 4237419);
-    
-    blockRunService.addRunBlock(12, LINK_ROUTE_KEY, 4237429);
-    
-    blockRunService.addRunBlock(13, LINK_ROUTE_KEY, 4237410);
-    
-    blockRunService.addRunBlock(14, LINK_ROUTE_KEY, 4237428);
-    
-    blockRunService.addRunBlock(15, LINK_ROUTE_KEY, 4237411);
-    
-    blockRunService.addRunBlock(16, LINK_ROUTE_KEY, 4237413);
-    
-    blockRunService.addRunBlock(17, LINK_ROUTE_KEY, 4237431);
-
-  }
-
-  private void buildNextStopTimeOffset(
-      Map<String, Integer> nextstoptimeoffsetmap2) throws Exception {
-    
-    // 7:39 trip 40_31625834
-    nextStopTimeOffsetMap.put("1:1466692740000", computeOffset("2016-06-23 07:39:00"));
-  }
-
-  
-  private Integer computeOffset(String stopTimeStr) throws Exception {
-    return (int) (parseTime(stopTimeStr) - parseTime("2016-06-23 00:00:00")); 
+    for (Block block : ga.getAllBlocks()) {
+      blockRunService.addRunBlock(block.getBlockRun(), block.getBlockRoute(), block.getBlockSequence());
+    }
+//   example run blocks
+//    blockRunService.addRunBlock(1, LINK_ROUTE_KEY, 4237386); sat
+//    blockRunService.addRunBlock(1, LINK_ROUTE_KEY, 4237399); sun
+//    blockRunService.addRunBlock(1, LINK_ROUTE_KEY, 4237416); weekday
   }
   
   long parseTime(String dateStr) throws Exception {
@@ -389,7 +238,7 @@ public class TUFeedBuilderServiceImplTest {
    * Train 15 does not report a run number and therefore comes across as unscheduled.
    * Confirm a trip is selected via the actual time of the next stop
    */
-  @Test
+//  @Test
   public void testBuildScheduleFeedMessage1() {
   }
 
@@ -397,81 +246,8 @@ public class TUFeedBuilderServiceImplTest {
    * Run 6 has two trains reporting on it.  Confirm the are both assigned
    * trips.
    */
-  @Test
+//  @Test
   public void testBuildScheduleFeedMessage2() {
-  }
-
-  
-  private static List<StopOffset> buildNbStopOffsets() {
-    List<StopOffset> nbStopOffsets = new ArrayList<>();
-    StopOffset offset = new StopOffset("99903", "SEA_PLAT", "1", 0);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("99905", "NB782T", "1", 3);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("55578", "NB484T", "1", 12);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("55656", "NB435T", "1", 15);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("55778", "NB331T", "1", 19);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("55860", "NB260T", "1", 22);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("99240", "NB215T", "1", 24);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("99256", "NB153T", "1", 27);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("99260", "NB117T", "1", 29);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("621", "NB1093T", "1", 31);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("532", "NB1075T", "1", 34);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("565", "NB1053T", "1", 36);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("1121", "NB1036T", "1", 38);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("99602", "NB1083T", "1", 41);
-    nbStopOffsets.add(offset);
-    offset = new StopOffset("99502", "NB1205T", "1", 44);
-    nbStopOffsets.add(offset);
-    
-    return nbStopOffsets;
-  }
-  
-  private static List<StopOffset> buildSbStopOffsets() {
-    List<StopOffset> sbStopOffsets = new ArrayList<>();
-    StopOffset offset = new StopOffset("99500", "SB1209T", "0", 0);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("99600", "SB1088T", "0", 3);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("1108", "SB1029T", "0", 6);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("455", "SB1047T", "0", 8);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("501", "SB1070T", "0", 10);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("623", "SB1087T", "0", 13);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("99101", "SB113T", "0", 15);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("99111", "SB148T", "0", 17);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("99121", "SB210T", "0", 20);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("55949", "SB255T", "0", 22);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("56039", "SB312T", "0", 25);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("56159", "SB417T", "0", 29);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("56173", "SB469T", "0", 32);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("99900", "SB778T", "0", 41);
-    sbStopOffsets.add(offset);
-    offset = new StopOffset("99904", "SEA_PLAT", "0", 44);
-    sbStopOffsets.add(offset);
-    
-    return sbStopOffsets;
   }
 
   

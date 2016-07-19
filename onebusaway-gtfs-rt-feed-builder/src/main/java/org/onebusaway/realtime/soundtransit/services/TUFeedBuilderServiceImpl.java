@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.onebusaway.gtfs.model.calendar.ServiceDate;
 import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
@@ -152,12 +153,7 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
           continue;
         }    
         
-        /* 
-         * TODO TODO TODO
-         * This code made the wrong assumption that we only want a single prediction for trip.
-         * Instead we want all future predictions per trip.
-         */
-        
+        // we want a stop time update for each AVL stop update 
         ArrivalTime arrivalTimeDetails = stopUpdate.getArrivalTime();
         if (arrivalTimeDetails != null) {
           String arrivalTime = arrivalTimeDetails.getActual();
@@ -306,32 +302,43 @@ public class TUFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
     List<TripInfo> trips = tripInfoList != null ? tripInfoList.getTrips() : null;
     if (trips != null) {
       for (TripInfo trip : trips) {
+        
+        long lastUpdated = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
         FeedEntity.Builder entity = FeedEntity.newBuilder();
         entity.setId(trip.getVehicleId());
         TripUpdate.Builder tu = TripUpdate.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         vd.setId(trip.getVehicleId());
         tu.setVehicle(vd.build());
-        TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip);
+        TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip, 
+            estimateServiceDate(new Date(lastUpdated*1000)));
         if (td == null) {
           _log.error("unmatched trip for trip " + trip.getTripId());
           continue;
         }
         tu.setTrip(td);
-        
+        _log.debug("building trip " + td.getTripId() + "(" + trip.getTripId() + ")");
         tu.addAllStopTimeUpdate(buildScheduleStopTimeUpdateList(trip, td.getTripId()));
-        tu.setTimestamp(avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate()));
+        tu.setTimestamp(lastUpdated);
         // set schedule deviation so OBA plots position accurately
         Integer delay = _linkTripService.calculateDelay(trip);
-        if (delay != null)
-          tu.setDelay(delay);
         
-        entity.setTripUpdate(tu);
-        feedMessageBuilder.addEntity(entity);
+        if (delay != null) {
+          _log.info(" delay= " + delay);
+          tu.setDelay(delay);
+        }
+        entity.setTripUpdate(tu.build());
+        feedMessageBuilder.addEntity(entity.build());
       } // end for trips
     } // end if trips != null
     return feedMessageBuilder.build();
 
+  }
+
+  private ServiceDate estimateServiceDate(Date date) {
+    // TODO if between 00:00 and 3:00 we are likely the previous day
+    ServiceDate sd = new ServiceDate(date);
+    return sd;
   }
 
   private Iterable<? extends StopTimeUpdate> buildScheduleStopTimeUpdateList(
