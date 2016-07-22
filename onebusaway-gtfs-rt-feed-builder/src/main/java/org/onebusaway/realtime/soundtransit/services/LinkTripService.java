@@ -24,7 +24,8 @@ public interface LinkTripService {
   public void updateTripsAndStops();
   public String getTripDirection(TripInfo trip);
   public TripDescriptor buildFrequencyTripDescriptor(TripInfo trip);
-  public TripDescriptor buildScheduleTripDescriptor(TripInfo trip, ServiceDate serviceDate);
+  public TripDescriptor buildScheduleTripDescriptor(TripInfo trip, ServiceDate serviceDate, long lastUpdatedInSeconds);
   public String getTripDirectionFromTripId(String tripId);
-  public Integer calculateDelay(TripInfo trip);
+  Integer calculateDelay(TripInfo trip, String tripId, ServiceDate serviceDate,
+      long lastUpdatedInSeconds);
 }

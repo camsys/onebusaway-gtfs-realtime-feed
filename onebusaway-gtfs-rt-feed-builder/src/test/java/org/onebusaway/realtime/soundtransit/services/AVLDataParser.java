@@ -59,7 +59,6 @@ public class AVLDataParser {
       stopMapping = new HashMap<String, String>();
       String ln = "";
       while ((ln = br.readLine()) != null) {
-//        _log.info(ln);
         int idx = ln.indexOf(',');
         if (idx > 0) {
           stopMapping.put(ln.substring(0, idx), ln.substring(idx + 1));

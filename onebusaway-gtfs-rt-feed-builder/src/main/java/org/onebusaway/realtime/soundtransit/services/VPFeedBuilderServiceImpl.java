@@ -40,7 +40,8 @@ import com.google.transit.realtime.GtfsRealtime.FeedHeader.Incrementality;
 
 public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
   private static Logger _log = LoggerFactory.getLogger(VPFeedBuilderServiceImpl.class);
-
+  private AvlParseService avlParseService = new AvlParseServiceImpl();
+  
   private FeedMessage buildFeedMessage(LinkAVLData linkAVLData) {
     // Update the list of trips (done only if the date has changed
     _linkTripService.updateTripsAndStops();
@@ -69,13 +70,7 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         VehiclePosition.Builder vp = VehiclePosition.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
-        String vehicleId = "";
-        // Use trip id from AVL, which is actually their "train label", 
-        // as vehicle id to avoid issues with vehicle id changing if train 
-        // backs up.
-        if (trip.getTripId() != null) {
-          vehicleId = trip.getTripId();
-        }
+        String vehicleId = avlParseService.hashVehicleId(trip.getVehicleId());
         vd.setId(vehicleId);
         vp.setVehicle(vd);
 
@@ -95,13 +90,7 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         long timestamp = 0L;
         String lastUpdatedDate = trip.getLastUpdatedDate();
         if (lastUpdatedDate != null) {
-          try {
-            DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-            Date parsedDate = df.parse(lastUpdatedDate);
-            timestamp = parsedDate.getTime() / 1000;
-          } catch (Exception e) {
-            _log.error("Exception parsing LastUpdatedDate time: " + lastUpdatedDate);
-          }
+          timestamp = avlParseService.parseAvlTimeAsSeconds(lastUpdatedDate);
         }
         timestamp = timestamp != 0L ? timestamp : System.currentTimeMillis()/1000;
         vp.setTimestamp(timestamp);

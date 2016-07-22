@@ -36,19 +36,21 @@ public class TUFeedBuilderServiceImplTest {
   private static final String LINK_ROUTE_ID = "100479";
   
   private LinkGtfsAdaptor ga;
+  private FeedServiceImpl _feedService;
+  private AVLDataParser avldp ;
+  private AvlParseService avlParseService = new AvlParseServiceImpl();
   
   @Before
   public void setup() throws Exception {
     // this data is based off of KCM "6/16/2016  2:31 PM     12678719 google_daily_transit.zip"
     ga = new LinkGtfsAdaptor("LinkJune2016", "20160623");
-  }
-  
-  @Test
-  // TODO:  this test has an ordering issue with java7, works with java8
-  public void testBuildScheduleFeedMessage() throws ClassNotFoundException, IOException {
-    AvlParseService avlParseService = new AvlParseServiceImpl();
+    
     
     TUFeedBuilderServiceImpl impl = new TUFeedBuilderServiceImpl();
+    TUFeedBuilderScheduleServiceImpl simpl = new TUFeedBuilderScheduleServiceImpl();
+    TUFeedBuilderComponent comp = new TUFeedBuilderComponent();
+    simpl.setTUFeedBuilderComponent(comp);
+    impl.setTUFeedBuilderScheduleServiceImpl(simpl);
     FederatedTransitDataBundle bundle = new FederatedTransitDataBundle();
     bundle.setPath(new File(System.getProperty("java.io.tmpdir")));
     BlockRunServiceImpl blockRunService = new BlockRunServiceImpl();
@@ -56,67 +58,12 @@ public class TUFeedBuilderServiceImplTest {
     blockRunService.setup();
     buildRunBlocks(blockRunService);
     
-    LinkTripServiceImpl linkTripService = new LinkTripServiceImpl(){
-
-      ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, ServiceDate serviceDate) {
-        int scheduleOffset = (int) (scheduleTime - ga.getServiceDate().getAsDate().getTime())/1000;
-        Block b = ga.getBlockForRun(blockRunNumber, serviceDate);
-        assertNotNull(b);
-        Trip trip = ga.getTripByBlockId("" + b.getId());
-        int lastArrivalOffset = Integer.MAX_VALUE;
-        for (StopTime st : ga.getStopTimesForTripId(trip.getId().getId())) {
-          if (st.isArrivalTimeSet() 
-              && st.getArrivalTime() < lastArrivalOffset 
-              && st.getArrivalTime() < scheduleOffset) {
-            lastArrivalOffset = st.getArrivalTime();
-          }
-        }
-        
-        ScheduledBlockLocation sbl = new ScheduledBlockLocation();
-        sbl.setNextStopTimeOffset(lastArrivalOffset);
-        return sbl;
-      }
-      
-
-      // override lookupTrip to not require a bundle
-      String lookupTripByRunId(String blockRunStr, Long scheduleTime, ServiceDate serviceDate) {
-        assertTrue("something is wrong with blockRunStr " + blockRunStr,
-            !scheduleTime.equals(new Long(0L)));
-        List<AgencyAndId> blockIds = lookupBlockIds(blockRunStr);
-        assertNotNull("expected block for run " + blockRunStr, blockIds);
-        assertTrue(blockIds.size() > 0);
-        String debugBlockId = "";
-        String tripId = null;
-        for (AgencyAndId agencyBlockId : blockIds) {
-          String blockId = agencyBlockId.getId();
-          debugBlockId += blockId + ", ";
-          tripId = verifyTrip(blockId, scheduleTime, serviceDate);
-          if (tripId != null) break; // we found it
-        }
-
-        // make sure we always find a trip from the above map
-        assertNotNull("blockId= " + debugBlockId + ", " 
-            + "blockRun=" + blockRunStr 
-            + " and scheduleTime=" 
-            + scheduleTime + " (" + new Date(scheduleTime) + ")"
-            , tripId);
-        return tripId.toString();
-      }
-      
-      private String verifyTrip(String blockId, Long scheduleTime, ServiceDate serviceDate) {
-        
-        AgencyAndId gtfsTripId = ga.findBestTrip(blockId, scheduleTime, serviceDate);
-        assertNotNull(gtfsTripId);
-        return gtfsTripId.getId();
-      }
-    };
+    LinkTripServiceImpl linkTripService = new TestLinkTripServiceImpl(ga);
     
-    FeedServiceImpl _feedService = null;
     _feedService = new FeedServiceImpl();
     _feedService.setAvlParseService(avlParseService);
     _feedService.setTuFeedBuilderServiceImpl(impl);
-    AVLDataParser avldp = new AVLDataParser(_feedService);
-
+    avldp = new AVLDataParser(_feedService);
     
     linkTripService.setBlockRunSerivce(blockRunService);
     linkTripService.setTimeToUpdateTripIds(Long.MAX_VALUE); //To prevent update
@@ -127,11 +74,19 @@ public class TUFeedBuilderServiceImplTest {
     linkStopService.setNbStopOffsets(avldp.buildNbStopOffsets());
     linkStopService.setSbStopOffsets(avldp.buildSbStopOffsets());
     impl.setLinkStopServiceImpl(linkStopService);
+    simpl.setLinkStopServiceImpl(linkStopService);
+    comp.setLinkStopServiceImpl(linkStopService);
     linkTripService.setLinkStopServiceImpl(linkStopService);
     linkTripService.setLinkRouteId(LINK_ROUTE_ID);
     List<TripEntry> allTrips = new ArrayList<TripEntry>();
     linkTripService.setTripEntries(allTrips);
     impl.setLinkTripServiceImpl(linkTripService);
+    simpl.setLinkTripServiceImpl(linkTripService);
+    comp.setLinkTripServiceImpl(linkTripService);
+  }
+  
+  @Test
+  public void testBuildScheduleFeedMessage() throws ClassNotFoundException, IOException {
     
     LinkAVLData linkAVLData = avldp.parseAVLDataFromFile(AVLDataParser.LINK_AVL_DATA_3);
     assertNotNull(linkAVLData);
@@ -157,8 +112,10 @@ public class TUFeedBuilderServiceImplTest {
    assertEquals("134:138", e1.getTripUpdate().getVehicle().getId());
 
    assertTrue(td1.hasTripId());
-   // tripId "1: 6" has run of 1 and via block.txt has block of 4237399
-   assertEquals("31625507", td1.getTripId());
+   Block b = ga.getBlockForRun(linkAVLData.getTrips().getTrips().get(0).getTripId().split(":")[0], ga.getServiceDate());
+   assertEquals(4237416, b.getBlockSequence());
+   // tripId "1: 6" has run of 1 and via block.txt has block of 4237416
+   assertEquals("31625834", td1.getTripId());
    // we want multiple updates!
    assertEquals(3, e1.getTripUpdate().getStopTimeUpdateCount());
    StopTimeUpdate e1st1 = e1.getTripUpdate().getStopTimeUpdateList().get(0);
@@ -172,13 +129,13 @@ public class TUFeedBuilderServiceImplTest {
    FeedEntity e2 = feedMessage.getEntity(1);
    TripDescriptor td2 = e2.getTripUpdate().getTrip();
    assertTrue(td2.hasTripId());
-   assertEquals("31625505", td2.getTripId());
+   assertEquals("31625956", td2.getTripId());
    
    // third entity
    FeedEntity e3 = feedMessage.getEntity(2);
    TripDescriptor td3 = e3.getTripUpdate().getTrip();
    assertTrue(td3.hasTripId());
-   assertEquals("31625506", td3.getTripId());
+   assertEquals("31625843", td3.getTripId());
    assertTrue(e3.hasTripUpdate());
    assertTrue(e3.getTripUpdate().hasDelay());
    /*
@@ -250,5 +207,63 @@ public class TUFeedBuilderServiceImplTest {
   public void testBuildScheduleFeedMessage2() {
   }
 
-  
+  // override the lookups to not need a bundle, but to use the GTFS instead
+  private static class TestLinkTripServiceImpl extends LinkTripServiceImpl {
+    private LinkGtfsAdaptor ga;
+    public TestLinkTripServiceImpl(LinkGtfsAdaptor ga) {
+      this.ga = ga;
+    }
+
+
+    ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, ServiceDate serviceDate) {
+      int scheduleOffset = (int) (scheduleTime - serviceDate.getAsDate().getTime())/1000;
+      Block b = ga.getBlockForRun(blockRunNumber, serviceDate);
+      assertNotNull(b);
+      Trip trip = ga.getTripByBlockId("" + b.getId());
+      int lastArrivalOffset = Integer.MAX_VALUE;
+      for (StopTime st : ga.getStopTimesForTripId(trip.getId().getId())) {
+        if (st.isArrivalTimeSet() 
+            && st.getArrivalTime() < lastArrivalOffset 
+            && st.getArrivalTime() < scheduleOffset) {
+          lastArrivalOffset = st.getArrivalTime();
+        }
+      }
+      
+      ScheduledBlockLocation sbl = new ScheduledBlockLocation();
+      sbl.setNextStopTimeOffset(lastArrivalOffset);
+      return sbl;
+    }
+    
+
+    // override lookupTrip to not require a bundle
+    String lookupTripByRunId(String blockRunStr, Long scheduleTime, ServiceDate serviceDate) {
+      assertTrue("something is wrong with blockRunStr " + blockRunStr,
+          !scheduleTime.equals(new Long(0L)));
+      List<AgencyAndId> blockIds = lookupBlockIds(blockRunStr);
+      assertNotNull("expected block for run " + blockRunStr, blockIds);
+      assertTrue(blockIds.size() > 0);
+      String debugBlockId = "";
+      String tripId = null;
+      for (AgencyAndId agencyBlockId : blockIds) {
+        String blockId = agencyBlockId.getId();
+        debugBlockId += blockId + ", ";
+        tripId = verifyTrip(blockId, scheduleTime, serviceDate);
+        if (tripId != null) break; // we found it
+      }
+      // make sure we always find a trip from the above map
+      assertNotNull("blockId= " + debugBlockId + ", " 
+          + "blockRun=" + blockRunStr 
+          + " and scheduleTime=" 
+          + scheduleTime + " (" + new Date(scheduleTime) + ")"
+          , tripId);
+      return tripId.toString();
+    }
+    
+    private String verifyTrip(String blockId, Long scheduleTime, ServiceDate serviceDate) {
+      
+      AgencyAndId gtfsTripId = ga.findBestTrip(blockId, scheduleTime, serviceDate);
+      if (gtfsTripId == null) return null;
+      return gtfsTripId.getId();
+    }
+  }
 }

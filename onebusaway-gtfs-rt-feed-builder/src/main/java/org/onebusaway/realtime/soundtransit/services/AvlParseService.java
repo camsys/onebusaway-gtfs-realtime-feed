@@ -25,4 +25,5 @@ public interface AvlParseService {
   long parseAvlTimeAsMillis(String arrivalTime);
   long parseAvlTimeAsSeconds(String arrivalTime);
   String formatAvlTime(Date d);
+  String hashVehicleId(String vehicleId);
 }

@@ -18,6 +18,7 @@ package org.onebusaway.realtime.soundtransit.services;
 import java.io.IOException;
 import java.util.Date;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -121,6 +122,21 @@ public class AvlParseServiceImpl implements AvlParseService {
       }
     }
     return linkAVLData;
+  }
+
+  // vehicle ids are of format carNum1 or carNum1:carNum2 or carNum1:carNum2:carNum3
+  // vehicle ids swap around, so arrange so they are always consistent
+  @Override
+  public String hashVehicleId(String vehicleId) {
+    String[] parts = vehicleId.split(":");
+    List<String> list = Arrays.asList(parts);
+    Collections.sort(list);
+    StringBuffer sb = new StringBuffer();
+    for (String s : list) {
+      sb.append(s);
+      sb.append(":");
+    }
+    return sb.substring(0, sb.length()-1);
   }
 
   /*

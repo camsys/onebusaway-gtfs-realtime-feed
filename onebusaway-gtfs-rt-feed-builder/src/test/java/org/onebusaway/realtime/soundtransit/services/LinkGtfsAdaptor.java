@@ -9,6 +9,8 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -84,6 +86,7 @@ public class LinkGtfsAdaptor {
       }
     }
     assertTrue(stopTimes.size() > 0);
+    Collections.sort(stopTimes);
     return stopTimes;
   }
   
@@ -101,19 +104,32 @@ public class LinkGtfsAdaptor {
         blocks.add(block);
       }
     }
-    if (blocks.size() == 3) {
-      return filterActiveBlock(blocks, serviceDate);
+    Block b = filterActiveBlock(blocks, serviceDate);
+    if (b == null) {
+      fail("no block present for run=" + blockRunNumber);
+      return null;
     }
-    if (blocks.size() == 1) {
-      return blocks.get(0); // in service only
-    }
-    
-    fail("unexpected number of blocks=" + blocks.size());
-    return null;
+    return b;
   }
 
+  public Block getBlockBySequence(int sequence) {
+    for (Block block : dao.getAllBlocks()) {
+      if (block.getBlockSequence() == sequence)
+      return block;
+    }
+    return null;
+  }
   
-  private Block filterActiveBlock(List<Block> blocks, ServiceDate serviceDate) {
+  public ServiceCalendar getCalendarByServiceId(String serviceId) {
+    for (ServiceCalendar calendar : dao.getAllCalendars()) {
+      if (serviceId.equals(calendar.getServiceId().getId())) {
+        return calendar;
+      }
+    }
+    return null;
+  }
+  
+  Block filterActiveBlock(List<Block> blocks, ServiceDate serviceDate) {
     for (Block block : blocks) {
       Trip trip = getTripByBlockId("" + block.getBlockSequence());
       if (isActiveServiceId(trip, serviceDate)) {
@@ -123,65 +139,87 @@ public class LinkGtfsAdaptor {
     return null; // not found
   }
 
-  private boolean isActiveServiceId(Trip trip, ServiceDate serviceDate) {
-    for (ServiceCalendar calendar : dao.getAllCalendars()) {
-      if (calendar.getServiceId().equals(trip.getServiceId())) {
-            if (calendar.getStartDate().compareTo(serviceDate) <= 0
-            && calendar.getEndDate().compareTo(serviceDate) >= 0) {
-          // we are in the correct range, need to verify the day
-          if (isDayActive(calendar, serviceDate)) {
-            return true;
-          }
-        }
+  boolean isActiveServiceId(Trip trip, ServiceDate serviceDate) {
+    ServiceCalendar calendar = getCalendarByServiceId(trip.getServiceId().getId());
+    long cStart = calendar.getStartDate().getAsDate().getTime();
+    long cEnd = calendar.getEndDate().getAsDate().getTime();
+    long sd = serviceDate.getAsDate().getTime();
+    if (sd >= cStart && sd <= cEnd) {
+      // we are in the correct range, need to verify the day
+      if (isDayActive(calendar, serviceDate)) {
+        return true;
       }
     }
     return false;
   }
 
-  private boolean isDayActive(ServiceCalendar calendar,
+  boolean isDayActive(ServiceCalendar calendar,
           ServiceDate serviceDate) {
     Calendar asCalendar = serviceDate.getAsCalendar(TimeZone.getDefault());
     switch (asCalendar.get(Calendar.DAY_OF_WEEK)) {
       case Calendar.MONDAY:
         if (calendar.getMonday() > 0) return true;
+        break;
       case Calendar.TUESDAY:
         if (calendar.getTuesday() > 0) return true;
+        break;
       case Calendar.WEDNESDAY:
         if (calendar.getWednesday() > 0)  return true;
+        break;
       case Calendar.THURSDAY:
         if (calendar.getThursday() > 0) return true;
+        break;
       case Calendar.FRIDAY:
         if (calendar.getFriday() > 0) return true;
+        break;
       case Calendar.SATURDAY:
         if (calendar.getSaturday() > 0) return true;
+        break;
       case Calendar.SUNDAY:
         if (calendar.getSunday() > 0) return true;
+        break;
       default:
+        fail("unexpected case for asCalendar=" + asCalendar
+            + " for day=" + asCalendar.get(Calendar.DAY_OF_WEEK));
         return false;
     }
-    
+    return false;
   } 
 
   
   public AgencyAndId findBestTrip(String blockId, Long scheduleTime, ServiceDate serviceDate) {
-    Trip bestTrip = null;
-    int i = 0;
     for (Trip trip : dao.getAllTrips()) {
-      i++;
-      if (trip.getBlockId() != null && trip.getBlockId().equals(blockId)
-          && this.isActiveServiceId(trip, serviceDate)) {
-        bestTrip = trip;
+      if (trip.getBlockId() != null && trip.getBlockId().equals(blockId)) {
+        if (this.isActiveServiceId(trip, serviceDate)) {
+          List<StopTime> stopTimes = getStopTimesForTripId(trip.getId().getId());
+          verifyStopTimes(stopTimes);
+          Long firstStopTime = stopTimes.get(0).getArrivalTime() * 1000 + serviceDate.getAsDate().getTime();
+          Long lastStopTime = stopTimes.get(stopTimes.size()-1).getArrivalTime() * 1000 + serviceDate.getAsDate().getTime();
+          assertTrue(firstStopTime < lastStopTime);
+          Long window = 5 * 60 * 1000l; // no overlap
+          if (scheduleTime >= firstStopTime - window && scheduleTime <= lastStopTime + window) {
+            return trip.getId();
+          } else {
+            _log.debug("no trip found for " + blockId + " on serviceDate=" + serviceDate
+                + " with " + new Date(firstStopTime) + " <= " + new Date(scheduleTime) + " <= " + new Date(lastStopTime));
+          }
+        }
       }
     }
-    if (bestTrip == null) {
-      throw new IllegalStateException("blockId " + blockId + " does not exist in GTFS with " + i + " trips");
-    }
-    List<StopTime> stopTimes = getStopTimesForTripId(bestTrip.getId().getId());
-    if (!stopTimes.isEmpty()) {
-      return bestTrip.getId();
-    }
     
-    throw new IllegalStateException("no stop times for trip=" + bestTrip);
+    return null;
+  }
+
+  private void verifyStopTimes(List<StopTime> stopTimes) {
+    int min = Integer.MIN_VALUE;
+    for (StopTime st : stopTimes) {
+      if (st.getArrivalTime() > min) {
+        min = st.getArrivalTime();
+      } else {
+        fail("stop times not in increasing order, last=" + min
+            + ", current=" + st.getArrivalTime());
+      }
+    }
   }
 
   long parseTime(String dateStr) throws Exception {

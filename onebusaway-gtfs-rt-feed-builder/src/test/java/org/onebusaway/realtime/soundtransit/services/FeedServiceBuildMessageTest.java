@@ -105,7 +105,16 @@ public class FeedServiceBuildMessageTest {
     vpFeedBuilderServiceImpl = new VPFeedBuilderServiceImpl();
     vpFeedBuilderServiceImpl.setLinkTripServiceImpl(linkTripService);
     vpFeedBuilderServiceImpl.setLinkStopServiceImpl(linkStopService);
+    TUFeedBuilderComponent comp = new TUFeedBuilderComponent ();
+    comp.setLinkStopServiceImpl(linkStopService);
+    comp.setLinkTripServiceImpl(linkTripService);
+    TUFeedBuilderFrequencyServiceImpl impl = new TUFeedBuilderFrequencyServiceImpl();
+    impl.setLinkStopServiceImpl(linkStopService);
+    impl.setLinkTripServiceImpl(linkTripService);
+    impl.setTUFeedBuilderComponent(comp);
     tuFeedBuilderServiceImpl = new TUFeedBuilderServiceImpl();
+    tuFeedBuilderServiceImpl.setTUFeedBuilderFrequencyServiceImpl(impl);
+    
     tuFeedBuilderServiceImpl.setLinkTripServiceImpl(linkTripService);
     tuFeedBuilderServiceImpl.setLinkStopServiceImpl(linkStopService);
 
