@@ -641,9 +641,14 @@ public class LinkTripServiceImpl implements LinkTripService {
   }
   
   @Override
-  public int calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate) {
+  public int calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate, long lastUpdatedInSeconds) {
     
     TripEntry tripEntry = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
+    
+    // Unit tests: no transit graph. Fall back to delay.
+    if (tripEntry == null) {
+      return calculateDelay(trip, tripId, serviceDate, lastUpdatedInSeconds);
+    }
     
     long time = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
     double lat = Double.parseDouble(trip.getLat());

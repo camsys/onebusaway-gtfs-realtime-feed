@@ -28,5 +28,5 @@ public interface LinkTripService {
   public String getTripDirectionFromTripId(String tripId);
   Integer calculateDelay(TripInfo trip, String tripId, ServiceDate serviceDate,
       long lastUpdatedInSeconds);
-  public int calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate);
+  int calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate, long lastUpdatedInSeconds);
 }
