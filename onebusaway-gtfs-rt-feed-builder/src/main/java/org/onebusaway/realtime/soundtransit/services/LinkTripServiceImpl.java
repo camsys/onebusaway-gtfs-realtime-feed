@@ -15,6 +15,8 @@
  */
 package org.onebusaway.realtime.soundtransit.services;
 
+import static org.onebusaway.transit_data_federation.testing.UnitTestingSupport.blockConfiguration;
+
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import org.onebusaway.geospatial.model.CoordinatePoint;
 import org.onebusaway.gtfs.model.AgencyAndId;
 import org.onebusaway.gtfs.model.calendar.LocalizedServiceId;
 import org.onebusaway.gtfs.model.calendar.ServiceDate;
@@ -36,6 +39,7 @@ import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.transit_data_federation.services.ExtendedCalendarService;
 import org.onebusaway.transit_data_federation.services.blocks.BlockCalendarService;
+import org.onebusaway.transit_data_federation.services.blocks.BlockGeospatialService;
 import org.onebusaway.transit_data_federation.services.blocks.BlockInstance;
 import org.onebusaway.transit_data_federation.services.blocks.BlockRunService;
 import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
@@ -68,10 +72,13 @@ public class LinkTripServiceImpl implements LinkTripService {
   private BlockCalendarService _blockCalendarService;
   private ScheduledBlockLocationService _blockLocationService;
   private BlockRunService _blockRunService;
+  private BlockGeospatialService _blockGeospatialService;
   private String _defaultAgencyId = "40";
   private String _agencyId;
   private Integer _linkRouteKey = null;
   private static Integer DEFAULT_LINK_ROUTE_KEY = 599;
+
+  
   private Integer getLinkRouteKey() {
     if (_linkRouteKey == null) {
       return DEFAULT_LINK_ROUTE_KEY;
@@ -125,6 +132,11 @@ public class LinkTripServiceImpl implements LinkTripService {
   @Autowired
   public void setBlockRunSerivce(BlockRunService blockRunService) {
     _blockRunService = blockRunService;
+  }
+  
+  @Autowired
+  public void setBlockGeospatialService(BlockGeospatialService blockGeospatialService) {
+    _blockGeospatialService = blockGeospatialService;
   }
 
   public void setTripEntries(List<TripEntry> tripEntries) {  // For JUnit tests
@@ -627,5 +639,35 @@ public class LinkTripServiceImpl implements LinkTripService {
     
     return diffInSeconds;
   }
+  
+  @Override
+  public int calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate) {
+    
+    TripEntry tripEntry = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
+    
+    long time = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
+    double lat = Double.parseDouble(trip.getLat());
+    double lon = Double.parseDouble(trip.getLon());
+    long serviceDateTime = serviceDate.getAsDate().getTime();
+    
+    long effSchedTimeSec = getEffectiveScheduleTime(tripEntry, lat, lon, time, serviceDateTime);
+    long effSchedTime = effSchedTimeSec + (serviceDateTime/1000);
+    
+    return (int) (time - effSchedTime);
+  }
+  
+  private long getEffectiveScheduleTime(TripEntry trip, double lat, double lon, long timestamp, long serviceDate) {
+    
+    ServiceIdActivation serviceIds = new ServiceIdActivation(trip.getServiceId());
+    BlockConfigurationEntry blockConfig = blockConfiguration(trip.getBlock(), serviceIds, trip);
+    BlockInstance block = new BlockInstance(blockConfig, serviceDate);
+    CoordinatePoint location = new CoordinatePoint(lat, lon);
+     
+    ScheduledBlockLocation loc = _blockGeospatialService.getBestScheduledBlockLocationForLocation(
+        block, location, timestamp, 0, trip.getTotalTripDistance());
+    
+    return loc.getScheduledTime();
+  }
+  
 
 }

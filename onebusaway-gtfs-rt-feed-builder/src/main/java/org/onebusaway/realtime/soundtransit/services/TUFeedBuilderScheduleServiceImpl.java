@@ -95,8 +95,8 @@ public class TUFeedBuilderScheduleServiceImpl {
         _log.debug("building trip " + td.getTripId() + "(" + trip.getTripId() + ")");
         tu.addAllStopTimeUpdate(buildScheduleStopTimeUpdateList(trip, td.getTripId(), lastUpdatedInSeconds));
         tu.setTimestamp(lastUpdatedInSeconds);
-        // set schedule deviation so OBA plots position accurately
-        Integer delay = _linkTripService.calculateDelay(trip, td.getTripId(), serviceDate, lastUpdatedInSeconds);
+        // use effective schedule deviation so OBA plots position accurately
+        Integer delay = _linkTripService.calculateEffectiveScheduleDeviation(trip, td.getTripId(), serviceDate);
         _log.info("delay of " + delay + " for trip " + td.getTripId() + "(" + trip.getTripId() + ")");
         
         if (delay != null) {
