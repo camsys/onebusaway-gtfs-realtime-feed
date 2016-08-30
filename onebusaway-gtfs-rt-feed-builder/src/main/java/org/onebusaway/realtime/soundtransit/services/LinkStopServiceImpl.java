@@ -200,7 +200,10 @@ public class LinkStopServiceImpl implements LinkStopService {
     if (nbTrip != null && nbTrip.getId() != null)
     _log.info("Northbound trip " + nbTrip.getId().toString() + " has "
         + nbStopCt + " stops.");
-    List<StopTimeEntry> sbStopTimeEntries = sbTrip.getStopTimes();
+    List<StopTimeEntry> sbStopTimeEntries = new ArrayList<StopTimeEntry>();
+    if (sbTrip != null) {
+      sbStopTimeEntries = sbTrip.getStopTimes();
+    }
     sbStopOffsets.clear();
     nbStopOffsets.clear();
     for (StopTimeEntry stopTimeEntry : sbStopTimeEntries) {
@@ -210,7 +213,10 @@ public class LinkStopServiceImpl implements LinkStopService {
       _log.info("GTFS/AVL id: " + gtfsStopId + " / " + avlStopId);
       sbStopOffsets.add(new StopOffset(gtfsStopId, avlStopId, "0", arrivalTime));
     }
-    List<StopTimeEntry> nbStopTimeEntries = nbTrip.getStopTimes();
+    List<StopTimeEntry> nbStopTimeEntries = new ArrayList<StopTimeEntry>();
+    if (nbTrip != null) {
+      nbTrip.getStopTimes();
+    }
     for (StopTimeEntry stopTimeEntry : nbStopTimeEntries) {
       String gtfsStopId = stopTimeEntry.getStop().getId().getId().toString();
       String avlStopId = getAVLStopId(gtfsStopId);
