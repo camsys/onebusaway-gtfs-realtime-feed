@@ -83,7 +83,11 @@ public class TUFeedBuilderScheduleServiceImpl {
         entity.setId(trip.getVehicleId());
         TripUpdate.Builder tu = TripUpdate.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
-        vd.setId(vehicleId);
+        /*
+         * AVL TripId is not like GTFS Trip Id, it is of format BlockSeq: InternalTripNumber
+         * and remains consistent across the block
+         */
+        vd.setId(trip.getTripId()); 
         tu.setVehicle(vd.build());
         TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip, 
             serviceDate, lastUpdatedInSeconds);
