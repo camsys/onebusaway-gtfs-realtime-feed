@@ -21,6 +21,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Map;
@@ -31,6 +35,12 @@ import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import javax.servlet.ServletContext;
 
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
@@ -56,6 +66,9 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   private String _url = null;
   private int _refreshOffset = 0;  // Default to refresh on the minute
   private int _refreshInterval = 60;
+  
+  // Allow HTTPS Connection without verification
+  private boolean _disableCertificateVerification = false;
   
   private FeedMessage vehiclePositionsFM = null;
   private FeedMessage tripUpdatesFM = null;
@@ -96,6 +109,11 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 
   public void setTripUpdatesFM(FeedMessage tripUpdatesFM) {
 	this.tripUpdatesFM = tripUpdatesFM;
+  }
+  
+  public void setDisableCertificateVerification(
+      boolean disableCertificateVerification) {
+    _disableCertificateVerification = disableCertificateVerification;
   }
 
 @PostConstruct
@@ -179,6 +197,15 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   private String readAvlUpdatesFromUrl(URL url) throws IOException {
     String result = "";
     HttpURLConnection avlConnection = (HttpURLConnection) url.openConnection();
+    
+    if(avlConnection instanceof HttpsURLConnection && _disableCertificateVerification) {
+      try {
+        disableSSL((HttpsURLConnection) avlConnection);
+      } catch (Exception e) {
+        _log.error("Unable to disable SSL: {}", e.getMessage());
+      }
+    }
+    
     avlConnection.setRequestProperty(
         "Accept",
         "application/json");
@@ -193,5 +220,37 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
       throw ex;
     }
     return result;
+  }
+  
+  private static void disableSSL(HttpsURLConnection conn) throws NoSuchAlgorithmException, KeyManagementException {
+    SSLContext sc = SSLContext.getInstance("TLS");
+    
+    TrustManager tm = new X509TrustManager() {
+
+      @Override
+      public void checkClientTrusted(X509Certificate[] chain, String authType)
+          throws CertificateException {
+      }
+
+      @Override
+      public void checkServerTrusted(X509Certificate[] chain, String authType)
+          throws CertificateException {
+      }
+
+      @Override
+      public X509Certificate[] getAcceptedIssuers() {
+        return null;
+      }
+    };
+    
+    sc.init(null, new TrustManager[] { tm }, new java.security.SecureRandom());
+    conn.setSSLSocketFactory(sc.getSocketFactory());
+    conn.setHostnameVerifier(
+        new HostnameVerifier(){
+            public boolean verify(String arg0, SSLSession arg1) {
+                return true;
+            }
+        }
+    );
   }
 }

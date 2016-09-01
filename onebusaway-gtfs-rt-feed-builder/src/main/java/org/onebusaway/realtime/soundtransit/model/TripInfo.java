@@ -27,6 +27,8 @@ public class TripInfo {
 	@JsonProperty("Lon") String lon;
 	@JsonProperty("Direction") String direction;
 	@JsonProperty("StopUpdates") StopUpdatesList stopUpdates;
+	@JsonProperty("TrainId") String trainId;
+	@JsonProperty("StartDate") String startDate;
 	
 	public String getTripId() {
 		return tripId;
@@ -82,4 +84,16 @@ public class TripInfo {
 	public void setStopUpdates(StopUpdatesList stopUpdates) {
 		this.stopUpdates = stopUpdates;
 	}
+	public String getTrainId() {
+	  return trainId;
+	}
+	public void setTrainId(String trainId) {
+	  this.trainId = trainId;
+	}
+  public String getStartDate() {
+    return startDate;
+  }
+  public void setStartDate(String startDate) {
+    this.startDate = startDate;
+  }
 }
