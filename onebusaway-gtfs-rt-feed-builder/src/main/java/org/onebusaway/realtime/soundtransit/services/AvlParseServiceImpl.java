@@ -124,19 +124,10 @@ public class AvlParseServiceImpl implements AvlParseService {
     return linkAVLData;
   }
 
-  // vehicle ids are of format carNum1 or carNum1:carNum2 or carNum1:carNum2:carNum3
-  // vehicle ids swap around, so arrange so they are always consistent
+  // vehicle ids now AVL trips, no hashing required
   @Override
   public String hashVehicleId(String vehicleId) {
-    String[] parts = vehicleId.split(":");
-    List<String> list = Arrays.asList(parts);
-    Collections.sort(list);
-    StringBuffer sb = new StringBuffer();
-    for (String s : list) {
-      sb.append(s);
-      sb.append(":");
-    }
-    return sb.substring(0, sb.length()-1);
+    return vehicleId;
   }
 
   /*
