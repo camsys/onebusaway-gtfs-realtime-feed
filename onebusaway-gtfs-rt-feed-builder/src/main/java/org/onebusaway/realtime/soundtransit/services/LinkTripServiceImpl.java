@@ -59,6 +59,7 @@ import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 import com.google.transit.realtime.GtfsRealtime.TripDescriptor.ScheduleRelationship;
 
 public class LinkTripServiceImpl implements LinkTripService {
+  private static final int MAX_RECURSE = 20;
   private static Logger _log = LoggerFactory.getLogger(LinkTripServiceImpl.class);
   private long timeToUpdateTripIds = 0;
   private static int TRIP_CUTOVER_HOUR = 3; // Trips starting before this hour
@@ -328,11 +329,12 @@ public class LinkTripServiceImpl implements LinkTripService {
     TripDescriptor.Builder td = TripDescriptor.newBuilder();
     String tripId = lookupTripByRunId(getBlockRun(trip), 
         findBestStopTimeUpdateScheduledTime(trip.getStopUpdates(), lastUpdatedInSeconds), 
+        trip.getDirection(),
         serviceDate);
     
     // unmatched trip, nothing we can do
     if (tripId == null) {
-      _log.info("unmatched trip for avl trip " + trip.getTripId());
+      _log.debug("unmatched trip for avl trip " + trip.getTripId());
       return null;
     }
 
@@ -385,11 +387,11 @@ public class LinkTripServiceImpl implements LinkTripService {
     return null;
   }
   
-  ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, ServiceDate serviceDate) {
+  ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, String avlDirection, ServiceDate serviceDate) {
     _log.debug("lookupTrip(" + blockRunNumber + ", " + scheduleTime + ")");
     List<AgencyAndId> blockIds = lookupBlockIds(blockRunNumber);
     if (blockIds == null) {
-      _log.error("no suitable blockIds for run=" + blockRunNumber);
+      _log.debug("no suitable blockIds for run=" + blockRunNumber);
       return null;
     }
     BlockInstance instance = null;
@@ -403,14 +405,15 @@ public class LinkTripServiceImpl implements LinkTripService {
       instance = _blockCalendarService.getBlockInstance(blockId, serviceDate.getAsDate().getTime());
       if (instance == null) {
         _log.error("unmatched block=" + blockId + " for time= " + scheduleTime
-            + "(" + new Date(scheduleTime) + ")");
+            + "(" + new Date(scheduleTime) + ")" + " and run=" + blockRunNumber);
         continue;
       }
       
       int secondsIntoDay = (int) TimeUnit.SECONDS.convert(scheduleTime - serviceDate.getAsDate().getTime(), TimeUnit.MILLISECONDS);
       
-      // we've found a block, now we need to search the block for the appropriate active trip
-      ScheduledBlockLocation blockLocation = _blockLocationService.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
+      // we've found a block, now we need to search the block for the appropriate active trip that matches the avlDirection
+      
+      ScheduledBlockLocation blockLocation = findBestBlockLocation(instance, avlDirection, secondsIntoDay, 0);
       if (blockLocation == null || blockLocation.getActiveTrip() == null && blockLocation.getActiveTrip().getTrip() == null)
         continue;
       
@@ -438,9 +441,33 @@ public class LinkTripServiceImpl implements LinkTripService {
     
   }
   
+  ScheduledBlockLocation findBestBlockLocation(BlockInstance instance, String avlDirection, int secondsIntoDay, int recursionCount) {
+    ScheduledBlockLocation blockLocation = _blockLocationService.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
+    if (blockLocation == null) return null;
+    if (avlDirection != null) {
+      String locDirection = blockLocation.getActiveTrip().getTrip().getDirectionId();
+      if (!matchesDirection(avlDirection, locDirection)) {
+        // log potential schedule mismatches (GTFS out of sync with feed)
+        _log.debug("trip " + blockLocation.getActiveTrip().getTrip().getId() + " direction of " + locDirection
+            + " contradicts feed direction of " + avlDirection);
+        // recurse going back in time 5 minutes
+        if (recursionCount > MAX_RECURSE) {
+          _log.error("infinite recursion detected for trip + " + blockLocation.getActiveTrip().getTrip());
+          return null;
+        }
+        recursionCount++;
+        return findBestBlockLocation(instance, avlDirection, secondsIntoDay - (5 * 60), recursionCount);
+      }
+    }
+    if (recursionCount > 0)
+      _log.info("best block recursed " + recursionCount + " time(s)");
+    return blockLocation;
+    
+  }
+  
   // given a blockId find the active trip for the schedule time
-  String lookupTripByRunId(String blockRunNumber, Long scheduleTime, ServiceDate serviceDate) {
-    ScheduledBlockLocation blockLocation = lookupBlockLocation(blockRunNumber, scheduleTime, serviceDate);
+  String lookupTripByRunId(String blockRunNumber, Long scheduleTime, String avlDirection, ServiceDate serviceDate) {
+    ScheduledBlockLocation blockLocation = lookupBlockLocation(blockRunNumber, scheduleTime, avlDirection, serviceDate);
     if (blockLocation == null || blockLocation.getActiveTrip() == null && blockLocation.getActiveTrip().getTrip() == null)
       return null;
     
@@ -455,7 +482,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     try {
       List<Integer> blockIds = _blockRunService.getBlockIds(getLinkRouteKey(), Integer.parseInt(blockRunNumber));
       if (blockIds == null) {
-        _log.error("missing blockId for " + getLinkRouteKey() + " / " + blockRunNumber);
+        _log.debug("missing blockId for " + getLinkRouteKey() + " / " + blockRunNumber);
         return null;
       }
       for (Integer blockId : blockIds) {

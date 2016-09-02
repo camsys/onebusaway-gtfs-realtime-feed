@@ -101,10 +101,9 @@ public class TUFeedBuilderScheduleServiceImpl {
         tu.setTimestamp(lastUpdatedInSeconds);
         // use effective schedule deviation so OBA plots position accurately
         Integer delay = _linkTripService.calculateEffectiveScheduleDeviation(trip, td.getTripId(), serviceDate, lastUpdatedInSeconds);
-        _log.info("delay of " + delay + " for trip " + td.getTripId() + "(" + trip.getTripId() + ")");
         
         if (delay != null) {
-          _log.debug(" delay= " + delay + " for vehicle=" + trip.getVehicleId());
+          _log.info(" delay= " + delay + " for vehicle=" + trip.getVehicleId());
           tu.setDelay(delay);
         }
         entity.setTripUpdate(tu.build());

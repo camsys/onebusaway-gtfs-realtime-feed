@@ -109,7 +109,7 @@ public class TUFeedBuilderServiceImplTest {
    
    assertEquals(TripDescriptor.ScheduleRelationship.SCHEDULED, td1.getScheduleRelationship());
    assertTrue(e1.getTripUpdate().hasVehicle());
-   assertEquals("134:138", e1.getTripUpdate().getVehicle().getId());
+   assertEquals("1: 6", e1.getTripUpdate().getVehicle().getId());
 
    assertTrue(td1.hasTripId());
    Block b = ga.getBlockForRun(linkAVLData.getTrips().getTrips().get(0).getTripId().split(":")[0], ga.getServiceDate());
@@ -152,7 +152,7 @@ public class TUFeedBuilderServiceImplTest {
    
    
    // trip "11: 390" is running early, verify the estimated and not the scheduled time comes through
-   FeedEntity e4 = findByVehicleId(feedMessage, "111:145");
+   FeedEntity e4 = findByVehicleId(feedMessage, "11: 390");
    assertNotNull(e4);
    assertEquals(1466694620, e4.getTripUpdate().getStopTimeUpdateList().get(0).getArrival().getTime()); //2016-06-23T08:10:20.000-07:00
    
@@ -215,7 +215,7 @@ public class TUFeedBuilderServiceImplTest {
     }
 
 
-    ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, ServiceDate serviceDate) {
+    ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, String avlDirection, ServiceDate serviceDate) {
       int scheduleOffset = (int) (scheduleTime - serviceDate.getAsDate().getTime())/1000;
       Block b = ga.getBlockForRun(blockRunNumber, serviceDate);
       assertNotNull(b);
@@ -236,7 +236,7 @@ public class TUFeedBuilderServiceImplTest {
     
 
     // override lookupTrip to not require a bundle
-    String lookupTripByRunId(String blockRunStr, Long scheduleTime, ServiceDate serviceDate) {
+    String lookupTripByRunId(String blockRunStr, Long scheduleTime, String avlDirection, ServiceDate serviceDate) {
       assertTrue("something is wrong with blockRunStr " + blockRunStr,
           !scheduleTime.equals(new Long(0L)));
       List<AgencyAndId> blockIds = lookupBlockIds(blockRunStr);
