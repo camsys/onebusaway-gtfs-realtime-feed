@@ -668,27 +668,32 @@ public class LinkTripServiceImpl implements LinkTripService {
   }
   
   @Override
-  public int calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate, long lastUpdatedInSeconds) {
-    
-    TripEntry tripEntry = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
-    
-    // Unit tests: no transit graph. Fall back to delay.
-    if (tripEntry == null) {
-      return calculateDelay(trip, tripId, serviceDate, lastUpdatedInSeconds);
+  public Integer calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate, long lastUpdatedInSeconds) {
+    try {
+      TripEntry tripEntry = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
+      
+      // Unit tests: no transit graph. Fall back to delay.
+      if (tripEntry == null) {
+        return calculateDelay(trip, tripId, serviceDate, lastUpdatedInSeconds);
+      }
+      
+      long time = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
+      double lat = Double.parseDouble(trip.getLat());
+      double lon = Double.parseDouble(trip.getLon());
+      long serviceDateTime = serviceDate.getAsDate().getTime();
+      
+      Long effSchedTimeSec = getEffectiveScheduleTime(trip, tripEntry, lat, lon, time, serviceDateTime);
+      if (effSchedTimeSec == null) return null;
+      long effSchedTime = effSchedTimeSec + (serviceDateTime/1000);
+      
+      return (int) (time - effSchedTime);
+    } catch (Exception any) {
+      _log.error("exception processing effective schedule for trip" + trip, any);
+      return null;
     }
-    
-    long time = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
-    double lat = Double.parseDouble(trip.getLat());
-    double lon = Double.parseDouble(trip.getLon());
-    long serviceDateTime = serviceDate.getAsDate().getTime();
-    
-    long effSchedTimeSec = getEffectiveScheduleTime(trip, tripEntry, lat, lon, time, serviceDateTime);
-    long effSchedTime = effSchedTimeSec + (serviceDateTime/1000);
-    
-    return (int) (time - effSchedTime);
   }
   
-  private long getEffectiveScheduleTime(TripInfo tripInfo, TripEntry trip, double lat, double lon, long timestamp, long serviceDate) {
+  private Long getEffectiveScheduleTime(TripInfo tripInfo, TripEntry trip, double lat, double lon, long timestamp, long serviceDate) {
     
     ServiceIdActivation serviceIds = new ServiceIdActivation(trip.getServiceId());
     BlockConfigurationEntry blockConfig = blockConfiguration(trip.getBlock(), serviceIds, trip);
@@ -698,15 +703,9 @@ public class LinkTripServiceImpl implements LinkTripService {
     ScheduledBlockLocation loc = _blockGeospatialService.getBestScheduledBlockLocationForLocation(
         block, location, timestamp, 0, trip.getTotalTripDistance());
     if (loc != null && loc.getActiveTrip() != null) {
-      String locDirection = loc.getActiveTrip().getTrip().getDirectionId();
-      if (!matchesDirection(tripInfo.getDirection(), locDirection)) {
-        // log potential schedule mismatches (GTFS out of sync with feed)
-        _log.error("trip " + loc.getActiveTrip().getTrip().getId() + " direction of " + locDirection
-            + " contradicts feed direction of " + tripInfo.getDirection()
-            + " for vehicle=" + tripInfo.getVehicleId() + "/" + tripInfo.getTripId());
-      }
+      return (long) loc.getScheduledTime();
     }
-    return loc.getScheduledTime();
+    return null;
   }
 
   private boolean matchesDirection(String feedDirection, String gtfsDirection) {

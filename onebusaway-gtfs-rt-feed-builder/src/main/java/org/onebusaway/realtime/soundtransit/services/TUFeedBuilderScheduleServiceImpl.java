@@ -75,39 +75,46 @@ public class TUFeedBuilderScheduleServiceImpl {
     List<TripInfo> trips = tripInfoList != null ? tripInfoList.getTrips() : null;
     if (trips != null) {
       for (TripInfo trip : trips) {
-        
-        String vehicleId = avlParseService.hashVehicleId(trip.getVehicleId());
-        long lastUpdatedInSeconds = getLastUpdatedTimestampForTrip(vehicleId, trip);
-        ServiceDate serviceDate = estimateServiceDate(new Date(lastUpdatedInSeconds*1000));
-        FeedEntity.Builder entity = FeedEntity.newBuilder();
-        entity.setId(trip.getVehicleId());
-        TripUpdate.Builder tu = TripUpdate.newBuilder();
-        VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
-        /*
-         * AVL TripId is not like GTFS Trip Id, it is of format BlockSeq: InternalTripNumber
-         * and remains consistent across the block
-         */
-        vd.setId(trip.getTripId()); 
-        tu.setVehicle(vd.build());
-        TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip, 
-            serviceDate, lastUpdatedInSeconds);
-        if (td == null) {
-          _log.error("unmatched trip for trip " + trip.getTripId());
-          continue;
+        try {
+          String vehicleId = avlParseService.hashVehicleId(trip.getVehicleId());
+          long lastUpdatedInSeconds = getLastUpdatedTimestampForTrip(vehicleId, trip);
+          ServiceDate serviceDate = estimateServiceDate(new Date(lastUpdatedInSeconds*1000));
+          FeedEntity.Builder entity = FeedEntity.newBuilder();
+          entity.setId(trip.getVehicleId());
+          TripUpdate.Builder tu = TripUpdate.newBuilder();
+          VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
+          /*
+           * AVL TripId is not like GTFS Trip Id, it is of format BlockSeq: InternalTripNumber
+           * and remains consistent across the block
+           */
+          vd.setId(trip.getTripId()); 
+          tu.setVehicle(vd.build());
+          TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip, 
+              serviceDate, lastUpdatedInSeconds);
+          if (td == null) {
+            _log.error("unmatched trip for trip " + trip.getTripId());
+            continue;
+          }
+          tu.setTrip(td);
+          _log.debug("building trip " + td.getTripId() + "(" + trip.getTripId() + ")");
+          tu.addAllStopTimeUpdate(buildScheduleStopTimeUpdateList(trip, td.getTripId(), lastUpdatedInSeconds));
+          tu.setTimestamp(lastUpdatedInSeconds);
+          // use effective schedule deviation so OBA plots position accurately
+          Integer delay = _linkTripService.calculateEffectiveScheduleDeviation(trip, td.getTripId(), serviceDate, lastUpdatedInSeconds);
+          
+          if (delay != null) {
+            _log.info(" delay= " + delay + " for vehicle=" + trip.getVehicleId());
+            tu.setDelay(delay);
+          }
+          entity.setTripUpdate(tu.build());
+          feedMessageBuilder.addEntity(entity.build());
+        } catch (Exception any) {
+          /*
+           * if anything goes wrong here we only want 
+           * to loose the individual trip, not the entire feed
+           */
+          _log.error("exception processing trip:" + trip, any);
         }
-        tu.setTrip(td);
-        _log.debug("building trip " + td.getTripId() + "(" + trip.getTripId() + ")");
-        tu.addAllStopTimeUpdate(buildScheduleStopTimeUpdateList(trip, td.getTripId(), lastUpdatedInSeconds));
-        tu.setTimestamp(lastUpdatedInSeconds);
-        // use effective schedule deviation so OBA plots position accurately
-        Integer delay = _linkTripService.calculateEffectiveScheduleDeviation(trip, td.getTripId(), serviceDate, lastUpdatedInSeconds);
-        
-        if (delay != null) {
-          _log.info(" delay= " + delay + " for vehicle=" + trip.getVehicleId());
-          tu.setDelay(delay);
-        }
-        entity.setTripUpdate(tu.build());
-        feedMessageBuilder.addEntity(entity.build());
       } // end for trips
     } // end if trips != null
     return feedMessageBuilder.build();

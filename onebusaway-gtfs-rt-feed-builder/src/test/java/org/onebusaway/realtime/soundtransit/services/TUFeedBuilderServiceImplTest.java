@@ -251,6 +251,7 @@ public class TUFeedBuilderServiceImplTest {
         if (tripId != null) break; // we found it
       }
       // make sure we always find a trip from the above map
+      // TODO: this assertion makes time zone assumptions
       assertNotNull("blockId= " + debugBlockId + ", " 
           + "blockRun=" + blockRunStr 
           + " and scheduleTime=" 
