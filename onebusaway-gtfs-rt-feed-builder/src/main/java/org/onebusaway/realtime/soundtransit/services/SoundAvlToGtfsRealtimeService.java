@@ -146,14 +146,20 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     return DriverManager.getConnection(properties.get(DB_URL));
   }
 
-  void writeGtfsRealtimeOutput(String dataFromAvl) {
+  int[] writeGtfsRealtimeOutput(String dataFromAvl) {
+    int[] counts = {0, 0};
     LinkAVLData linkAVLData = _feedService.parseAVLFeed(dataFromAvl);
     if (linkAVLData != null) {
       TripInfoList tripInfoList = linkAVLData.getTrips();
       if (tripInfoList != null && tripInfoList.getTrips() != null
           && tripInfoList.getTrips().size() > 0) {
         vehiclePositionsFM = _feedService.buildVPMessage(linkAVLData);
+        if (vehiclePositionsFM != null) 
+          counts[0] = vehiclePositionsFM.getEntityCount();
         tripUpdatesFM = _feedService.buildTUMessage(linkAVLData);
+        if (tripUpdatesFM != null) {
+          counts[1] = tripUpdatesFM.getEntityCount();
+        }
       } else {
         String envMessage = tripInfoList != null ? tripInfoList.getEnvMessage() : null;
         if (envMessage != null && !envMessage.isEmpty()) {
@@ -162,12 +168,13 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
         }
       }
     }
+    return counts;
   }
 
-  public void writeGtfsRealtimeOutput() throws Exception {
+  public int[] writeGtfsRealtimeOutput() throws Exception {
     String dataFromAvl = readAvlUpdatesFromUrl(_linkAvlFeedUrl);
     _log.debug("AVL: " + dataFromAvl);
-    writeGtfsRealtimeOutput(dataFromAvl);
+    return writeGtfsRealtimeOutput(dataFromAvl);
   }
 
   public void setServletContext(ServletContext context) {
@@ -186,8 +193,8 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     public void run() {
       try {
         _log.info("refreshing vehicles");
-        writeGtfsRealtimeOutput();
-        _log.info("GTFS-rt feed updated");
+        int[] counts = writeGtfsRealtimeOutput();
+        _log.info("GTFS-rt feed updated with " + counts[0] + " vehicles positions and " + counts[1] + " trip updates");
       } catch (Exception ex) {
         _log.error("Failed to refresh TransitData: " + ex.getMessage(), ex);
       }

@@ -103,7 +103,7 @@ public class TUFeedBuilderScheduleServiceImpl {
           Integer delay = _linkTripService.calculateEffectiveScheduleDeviation(trip, td.getTripId(), serviceDate, lastUpdatedInSeconds);
           
           if (delay != null) {
-            _log.info(" delay= " + delay + " for vehicle=" + trip.getVehicleId());
+            _log.info(" delay= " + delay + " for vehicle=" + trip.getTripId());
             tu.setDelay(delay);
           }
           entity.setTripUpdate(tu.build());
@@ -135,7 +135,7 @@ public class TUFeedBuilderScheduleServiceImpl {
     }
     // if the positions equal, return the older timestamp
     if (lastCache.equals(cr)) {
-      _log.info("no update for " + vehicleId);
+      _log.info("no update for " + trip.getTripId());
       return lastCache.lastUpdated;
     }
     return cr.lastUpdated;
