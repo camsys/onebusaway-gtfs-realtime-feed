@@ -75,10 +75,15 @@ public class TUFeedBuilderScheduleServiceImpl {
     List<TripInfo> trips = tripInfoList != null ? tripInfoList.getTrips() : null;
     if (trips != null) {
       for (TripInfo trip : trips) {
+        StringBuffer debug = new StringBuffer();
         try {
+          
           String vehicleId = avlParseService.hashVehicleId(trip.getVehicleId());
+          debug.append(" vehicleId = " + vehicleId + "\n");
           long lastUpdatedInSeconds = getLastUpdatedTimestampForTrip(vehicleId, trip);
+          debug.append(" lastUpdatedInSeconds = " + lastUpdatedInSeconds + "\n");
           ServiceDate serviceDate = estimateServiceDate(new Date(lastUpdatedInSeconds*1000));
+          debug.append(" serviceDate = " + serviceDate + "\n");
           FeedEntity.Builder entity = FeedEntity.newBuilder();
           entity.setId(trip.getVehicleId());
           TripUpdate.Builder tu = TripUpdate.newBuilder();
@@ -88,9 +93,11 @@ public class TUFeedBuilderScheduleServiceImpl {
            * and remains consistent across the block
            */
           vd.setId(trip.getTripId()); 
+          debug.append("tripId = " + trip.getTripId() + "\n");
           tu.setVehicle(vd.build());
           TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip, 
               serviceDate, lastUpdatedInSeconds);
+          debug.append(" built td" + "\n");
           if (td == null) {
             _log.error("unmatched trip for trip " + trip.getTripId());
             continue;
@@ -98,10 +105,11 @@ public class TUFeedBuilderScheduleServiceImpl {
           tu.setTrip(td);
           _log.debug("building trip " + td.getTripId() + "(" + trip.getTripId() + ")");
           tu.addAllStopTimeUpdate(buildScheduleStopTimeUpdateList(trip, td.getTripId(), lastUpdatedInSeconds));
+          debug.append(" addAllStops... \n");
           tu.setTimestamp(lastUpdatedInSeconds);
           // use effective schedule deviation so OBA plots position accurately
           Integer delay = _linkTripService.calculateEffectiveScheduleDeviation(trip, td.getTripId(), serviceDate, lastUpdatedInSeconds);
-          
+          debug.append("delay = " + delay + "\n");
           if (delay != null) {
             _log.info(" delay= " + delay + " for vehicle=" + trip.getTripId());
             tu.setDelay(delay);
@@ -113,7 +121,7 @@ public class TUFeedBuilderScheduleServiceImpl {
            * if anything goes wrong here we only want 
            * to loose the individual trip, not the entire feed
            */
-          _log.error("exception processing trip:" + trip, any);
+          _log.error("exception processing trip:" + trip + "\n" + debug + "\n", any);
         }
       } // end for trips
     } // end if trips != null
@@ -124,9 +132,7 @@ public class TUFeedBuilderScheduleServiceImpl {
   // last modified updates on each request, we want it updated only when the data changed
   // use the vehicle position as an indicator that something has changed
   private long getLastUpdatedTimestampForTrip(String vehicleId, TripInfo trip) {
-    Long lastUpdated = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
-    trip.getLat();
-    trip.getLon();
+    long lastUpdated = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
     CacheRecord cr = new CacheRecord(trip.getLat(), trip.getLon(), lastUpdated);
     CacheRecord lastCache = positionCache.get(vehicleId);
     if (lastCache == null) {
@@ -206,13 +212,16 @@ public class TUFeedBuilderScheduleServiceImpl {
   }
 
   private static class CacheRecord {
-    String lat = null;
-    String lon = null;
-    Long lastUpdated = null;
+    String lat = "0.0";
+    String lon = "0.0";
+    Long lastUpdated = 0l;
     public CacheRecord(String lat, String lon, Long lastUpdated) {
-      this.lat = lat;
-      this.lon = lon;
-      this.lastUpdated = lastUpdated;
+      if (lat != null)
+        this.lat = lat;
+      if (lon != null)
+        this.lon = lon;
+      if (lastUpdated != null)
+        this.lastUpdated = lastUpdated;
     }
     public boolean equals(Object obj) {
       if (obj == null) return false;

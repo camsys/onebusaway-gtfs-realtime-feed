@@ -673,13 +673,20 @@ public class LinkTripServiceImpl implements LinkTripService {
       TripEntry tripEntry = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
       
       // Unit tests: no transit graph. Fall back to delay.
-      if (tripEntry == null) {
+      if (tripEntry == null || trip.getLat() == null || trip.getLon() == null) {
         return calculateDelay(trip, tripId, serviceDate, lastUpdatedInSeconds);
       }
       
       long time = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
-      double lat = Double.parseDouble(trip.getLat());
-      double lon = Double.parseDouble(trip.getLon());
+      double lat;
+      double lon;
+      try {
+        lat = Double.parseDouble(trip.getLat());
+        lon = Double.parseDouble(trip.getLon());
+      } catch (Exception any) {
+        _log.error("issue parsing lat/lon, falling back to simple delay for tripId " + tripId);
+        return calculateDelay(trip, tripId, serviceDate, lastUpdatedInSeconds);
+      }
       long serviceDateTime = serviceDate.getAsDate().getTime();
       
       Long effSchedTimeSec = getEffectiveScheduleTime(trip, tripEntry, lat, lon, time, serviceDateTime);
@@ -688,7 +695,7 @@ public class LinkTripServiceImpl implements LinkTripService {
       
       return (int) (time - effSchedTime);
     } catch (Exception any) {
-      _log.error("exception processing effective schedule for trip" + trip, any);
+      _log.error("exception processing effective schedule for trip " + trip, any);
       return null;
     }
   }

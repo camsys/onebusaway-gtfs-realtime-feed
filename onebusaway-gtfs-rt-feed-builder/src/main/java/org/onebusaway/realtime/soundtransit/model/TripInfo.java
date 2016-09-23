@@ -96,4 +96,10 @@ public class TripInfo {
   public void setStartDate(String startDate) {
     this.startDate = startDate;
   }
+  public String toString() {
+    return "TripInfo{"
+        + "tripId=" + tripId
+        + ", vehicleId=" + vehicleId
+        + "}";
+  }
 }

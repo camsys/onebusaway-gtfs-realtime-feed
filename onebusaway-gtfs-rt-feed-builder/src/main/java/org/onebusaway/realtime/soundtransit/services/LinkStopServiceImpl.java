@@ -100,7 +100,7 @@ public class LinkStopServiceImpl implements LinkStopService {
       // Check for special case at Sea-Tac Airport, where both northbound 
       // and southbound trains have an AVL stop id of "SEA_PLAT".
       if (mappedStopId.equals("99903") || mappedStopId.equals("99904")) {
-        if (direction == "0") {
+        if ("0".equals(direction)) {
           mappedStopId = "99904";
         } else {
           mappedStopId = "99903";
