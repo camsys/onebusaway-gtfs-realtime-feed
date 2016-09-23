@@ -97,7 +97,7 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
 
         StopUpdate nextStop = _linkStopService.findNextStopOnTrip(trip.getStopUpdates());
         if (nextStop == null) {
-          _log.info("Cannot determine next stop id for trip " + trip.getTripId());
+          _log.error("Cannot determine next stop id for trip " + trip.getTripId());
           continue;
         }
         String stopId = nextStop.getStopId();

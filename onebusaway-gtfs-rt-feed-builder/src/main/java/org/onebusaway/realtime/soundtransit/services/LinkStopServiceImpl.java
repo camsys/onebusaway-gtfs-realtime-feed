@@ -99,6 +99,8 @@ public class LinkStopServiceImpl implements LinkStopService {
     if (mappedStopId != null && !mappedStopId.isEmpty()) {
       // Check for special case at Sea-Tac Airport, where both northbound 
       // and southbound trains have an AVL stop id of "SEA_PLAT".
+      // TODO: clean this up or move to config
+      // 0 is south, 1 is north
       if (mappedStopId.equals("99903") || mappedStopId.equals("99904")) {
         if ("0".equals(direction)) {
           mappedStopId = "99904";
@@ -106,6 +108,25 @@ public class LinkStopServiceImpl implements LinkStopService {
           mappedStopId = "99903";
         }
       }
+      // UW
+      if (mappedStopId.equals("99604") || mappedStopId.equals("99605")) {
+        if ("0".equals(direction)) {
+          mappedStopId = "99604";
+        } else {
+          // north bound stop is 99605
+          mappedStopId = "99605";
+        }
+      }
+      // Angle Lake
+      if (mappedStopId.equals("99913") || mappedStopId.equals("99914")) {
+        if ("0".equals(direction)) {
+          mappedStopId = "99914";
+        } else {
+          // north bound stop is 99913
+          mappedStopId = "99913";
+        }
+      }
+
     }
     return mappedStopId;
   }
@@ -248,8 +269,13 @@ public class LinkStopServiceImpl implements LinkStopService {
   
   private String getAVLStopId(String gtfsStopId) {
     String result = "";
+    // TODO:  this should come from configuration
     if (gtfsStopId.equals("99903") || gtfsStopId.equals("99904")) {
       result = "SEA_PLAT";
+    } else if (gtfsStopId.equals("99604") || gtfsStopId.equals("99605")) {
+      result = "UWS_PLAT";
+    } else if (gtfsStopId.equals("99913") || gtfsStopId.equals("99914")) {
+      result = "ALS_PLAT";
     } else {
       Iterator it = stopMapping.entrySet().iterator();
       while (it.hasNext()) {
