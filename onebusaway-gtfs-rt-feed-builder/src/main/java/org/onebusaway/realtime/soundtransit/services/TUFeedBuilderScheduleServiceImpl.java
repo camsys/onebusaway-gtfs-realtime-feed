@@ -51,6 +51,7 @@ public class TUFeedBuilderScheduleServiceImpl {
   protected LinkTripService _linkTripService;
   protected LinkStopService _linkStopService;
   private AvlParseService avlParseService = new AvlParseServiceImpl();
+  private boolean _overrideLastUpdatedDate = true;
 
   @Autowired
   public void setLinkTripServiceImpl(LinkTripService linkTripService) {
@@ -65,6 +66,10 @@ public class TUFeedBuilderScheduleServiceImpl {
   @Autowired
   public void setTUFeedBuilderComponent(TUFeedBuilderComponent component) {
     _component = component;
+  }
+  
+  public void setOverrideLastUpdatedDate(boolean override) {
+    _overrideLastUpdatedDate = override;
   }
   
   public FeedMessage buildScheduleFeedMessage(LinkAVLData linkAVLData) {
@@ -133,6 +138,11 @@ public class TUFeedBuilderScheduleServiceImpl {
   // use the vehicle position as an indicator that something has changed
   private long getLastUpdatedTimestampForTrip(String vehicleId, TripInfo trip) {
     long lastUpdated = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
+    if (_overrideLastUpdatedDate && Math.abs(lastUpdated - (System.currentTimeMillis()/1000)) > 3600) {
+      // time is off by more than an hour, ignore it
+      lastUpdated = System.currentTimeMillis() / 1000;
+      _log.error("rejecting lastUpdated date of " + trip.getLastUpdatedDate() + " for vehicle " + vehicleId);
+    }
     CacheRecord cr = new CacheRecord(trip.getLat(), trip.getLon(), lastUpdated);
     CacheRecord lastCache = positionCache.get(vehicleId);
     if (lastCache == null) {

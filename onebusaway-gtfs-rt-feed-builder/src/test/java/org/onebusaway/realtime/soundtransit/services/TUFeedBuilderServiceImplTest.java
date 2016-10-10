@@ -48,6 +48,7 @@ public class TUFeedBuilderServiceImplTest {
     
     TUFeedBuilderServiceImpl impl = new TUFeedBuilderServiceImpl();
     TUFeedBuilderScheduleServiceImpl simpl = new TUFeedBuilderScheduleServiceImpl();
+    simpl.setOverrideLastUpdatedDate(false);
     TUFeedBuilderComponent comp = new TUFeedBuilderComponent();
     simpl.setTUFeedBuilderComponent(comp);
     impl.setTUFeedBuilderScheduleServiceImpl(simpl);
@@ -59,6 +60,7 @@ public class TUFeedBuilderServiceImplTest {
     buildRunBlocks(blockRunService);
     
     LinkTripServiceImpl linkTripService = new TestLinkTripServiceImpl(ga);
+    linkTripService.setOverrideScheduleTime(false);
     
     _feedService = new FeedServiceImpl();
     _feedService.setAvlParseService(avlParseService);

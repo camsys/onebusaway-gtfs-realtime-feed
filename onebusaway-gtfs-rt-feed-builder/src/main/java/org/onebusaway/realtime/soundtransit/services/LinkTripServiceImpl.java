@@ -78,6 +78,7 @@ public class LinkTripServiceImpl implements LinkTripService {
   private String _agencyId;
   private Integer _linkRouteKey = null;
   private static Integer DEFAULT_LINK_ROUTE_KEY = 599;
+  private boolean _overrideScheduleTime = true; 
 
   
   private Integer getLinkRouteKey() {
@@ -146,6 +147,10 @@ public class LinkTripServiceImpl implements LinkTripService {
 
   public void setLinkRouteId(String linkRouteId) {
     _linkRouteId = linkRouteId;
+  }
+  
+  public void setOverrideScheduleTime(boolean override) {
+    _overrideScheduleTime = override;
   }
   
   @Override
@@ -356,6 +361,13 @@ public class LinkTripServiceImpl implements LinkTripService {
       _log.info("found illegal schedule time=" + timeUpdate.getArrivalTime().getScheduled() + " for update=" + timeUpdate);
       return lastUpdatedInSeconds * 1000;
     }
+    
+    if (_overrideScheduleTime && Math.abs(scheduledTime - System.currentTimeMillis()) > 2 * 60 *60 *1000) {
+     // we have a crazy schedule, assume now instead
+      _log.error("ignoring scheduleTime of " + timeUpdate.getArrivalTime().getScheduled());
+      return System.currentTimeMillis();
+    }
+    
     return scheduledTime;
   }
   
@@ -402,7 +414,14 @@ public class LinkTripServiceImpl implements LinkTripService {
         _log.error("missing scheduleTime for blockRunNumber=" + blockRunNumber);
         continue;
       }
-      instance = _blockCalendarService.getBlockInstance(blockId, serviceDate.getAsDate().getTime());
+      try {
+        instance = _blockCalendarService.getBlockInstance(blockId, serviceDate.getAsDate().getTime());
+      } catch (Throwable t) {
+        _log.error("invalid blockId=" + blockId + " for blockRunNumber=" 
+            + blockRunNumber + ", scheduleTime=" + scheduleTime 
+            + ", serviceDate=" + serviceDate);
+        continue;
+      }
       if (instance == null) {
         _log.error("unmatched block=" + blockId + " for time= " + scheduleTime
             + "(" + new Date(scheduleTime) + ")" + " and run=" + blockRunNumber);

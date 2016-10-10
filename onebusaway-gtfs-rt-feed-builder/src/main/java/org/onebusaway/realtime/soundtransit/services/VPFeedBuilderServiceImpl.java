@@ -71,6 +71,10 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
         String vehicleId = avlParseService.hashVehicleId(trip.getVehicleId());
+        if (vehicleId == null) {
+          _log.error("encounterd null vehicleId for trip=" + trip + ", discarding");
+          continue;
+        }
         vd.setId(vehicleId);
         vp.setVehicle(vd);
 
