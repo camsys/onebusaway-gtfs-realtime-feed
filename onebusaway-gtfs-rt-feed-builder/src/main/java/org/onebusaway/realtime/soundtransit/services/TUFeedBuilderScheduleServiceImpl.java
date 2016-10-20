@@ -97,7 +97,7 @@ public class TUFeedBuilderScheduleServiceImpl {
            * AVL TripId is not like GTFS Trip Id, it is of format BlockSeq: InternalTripNumber
            * and remains consistent across the block
            */
-          vd.setId(trip.getTripId()); 
+          vd.setId(trip.getTrainId()); 
           debug.append("tripId = " + trip.getTripId() + "\n");
           tu.setVehicle(vd.build());
           TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip, 
