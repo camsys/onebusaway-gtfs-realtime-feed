@@ -46,6 +46,7 @@ import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLoca
 import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocationService;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.BlockTripEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.FrequencyEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.ServiceIdActivation;
 import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
@@ -441,9 +442,16 @@ public class LinkTripServiceImpl implements LinkTripService {
       long firstStopTime = stopTimes.get(0).getArrivalTime() * 1000 + serviceDate.getAsDate().getTime();
       long lastStopTime = stopTimes.get(stopTimes.size()-1).getArrivalTime() * 1000 + serviceDate.getAsDate().getTime();
       long window = 20 * 60 * 1000; // 20 minutes
+      
+      // to be fair, we expand our search to the next trip in the block
+      BlockTripEntry nextTrip = blockLocation.getActiveTrip().getNextTrip();
+      if (nextTrip != null) {
+        List<StopTimeEntry> nextTripStopTimes = nextTrip.getTrip().getStopTimes();
+        lastStopTime = nextTripStopTimes.get(nextTripStopTimes.size()-1).getArrivalTime() * 1000 + serviceDate.getAsDate().getTime();
+      }
       if (scheduleTime > lastStopTime + window || firstStopTime - window > scheduleTime) {
         _log.error("blockLocation outside of trip: blockRunNumber=" + blockRunNumber
-            + ", scheduleTime=" + new Date(scheduleTime*1000 + serviceDate.getAsDate().getTime()) + " (" + scheduleTime + ")"
+            + ", scheduleTime=" + new Date(scheduleTime) + " (" + scheduleTime + ")"
             + ", serviceDate=" + serviceDate
             + ", blockId=" + blockId
             + ", tripId=" + blockLocation.getActiveTrip().getTrip().getId()
@@ -487,8 +495,10 @@ public class LinkTripServiceImpl implements LinkTripService {
   // given a blockId find the active trip for the schedule time
   String lookupTripByRunId(String blockRunNumber, Long scheduleTime, String avlDirection, ServiceDate serviceDate) {
     ScheduledBlockLocation blockLocation = lookupBlockLocation(blockRunNumber, scheduleTime, avlDirection, serviceDate);
-    if (blockLocation == null || blockLocation.getActiveTrip() == null && blockLocation.getActiveTrip().getTrip() == null)
+    if (blockLocation == null || blockLocation.getActiveTrip() == null && blockLocation.getActiveTrip().getTrip() == null) {
+      _log.error("tossing blockRunNumber " + blockRunNumber);
       return null;
+    }
     
     return blockLocation.getActiveTrip().getTrip().getId().getId();
   }
