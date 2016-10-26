@@ -90,6 +90,10 @@ public class TUFeedBuilderScheduleServiceImpl {
           ServiceDate serviceDate = estimateServiceDate(new Date(lastUpdatedInSeconds*1000));
           debug.append(" serviceDate = " + serviceDate + "\n");
           FeedEntity.Builder entity = FeedEntity.newBuilder();
+          if (trip.getVehicleId() == null) {
+            // we have a ghost train -- nothing to see here
+            continue;
+          }
           entity.setId(trip.getVehicleId());
           TripUpdate.Builder tu = TripUpdate.newBuilder();
           VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
@@ -97,7 +101,11 @@ public class TUFeedBuilderScheduleServiceImpl {
            * AVL TripId is not like GTFS Trip Id, it is of format BlockSeq: InternalTripNumber
            * and remains consistent across the block
            */
-          vd.setId(trip.getTrainId()); 
+          if (trip.getTrainId() != null) {
+            vd.setId(trip.getTrainId());
+          } else {
+            vd.setId(trip.getTripId());
+          }
           debug.append("tripId = " + trip.getTripId() + "\n");
           tu.setVehicle(vd.build());
           TripDescriptor td = _linkTripService.buildScheduleTripDescriptor(trip, 
