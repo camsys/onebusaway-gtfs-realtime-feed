@@ -177,7 +177,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
       _log.debug("AVL: " + dataFromAvl);
       return writeGtfsRealtimeOutput(dataFromAvl);
     } catch (Exception any) {
-      _log.error("exception reading from " + _linkAvlFeedUrl, any);
+      _log.error("exception reading from " + _linkAvlFeedUrl);
     }
     int[] empty = {0, 0};
     return empty;

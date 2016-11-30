@@ -58,7 +58,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 import com.google.transit.realtime.GtfsRealtime.TripDescriptor.ScheduleRelationship;
-import org.springframework.scheduling.annotation.Scheduled;
 
 public class LinkTripServiceImpl implements LinkTripService {
   private static final int MAX_RECURSE = 20;
@@ -409,8 +408,6 @@ public class LinkTripServiceImpl implements LinkTripService {
       return null;
     }
     BlockInstance instance = null;
-    ScheduledBlockLocation best = null;
-    Long bestMetric = null;
     
     for (AgencyAndId blockId : blockIds) {
       _log.debug("found blockId=" + blockId);
@@ -427,7 +424,7 @@ public class LinkTripServiceImpl implements LinkTripService {
         continue;
       }
       if (instance == null) {
-        _log.debug("unmatched block=" + blockId + " for time= " + scheduleTime
+        _log.error("unmatched block=" + blockId + " for time= " + scheduleTime
             + "(" + new Date(scheduleTime) + ")" + " and run=" + blockRunNumber);
         continue;
       }
@@ -461,50 +458,16 @@ public class LinkTripServiceImpl implements LinkTripService {
             + ", firstStopTime=" + new Date(firstStopTime)
             + ", lastStopTime=" + new Date(lastStopTime));
       }
-
-      Long metric = rateBlockLocation(blockLocation, scheduleTime, avlDirection, serviceDate);
-      if (bestMetric == null || metric < bestMetric) {
-        if (bestMetric != null) {
-          _log.info("metric=" + metric + " is better than " + bestMetric + " for train " + blockRunNumber);
-        }
-        bestMetric = metric;
-        best = blockLocation;
-      }
+      return blockLocation;
     }
 
-    if (best == null) {
-      // the block is no longer active (old data?)
-      _log.info("fall through for " + blockRunNumber + ", " + scheduleTime + ", " + serviceDate
-              + " with considered blockIds=" + blockIds);
-    }
-    return best;
+    // the block is no longer active (old data?)
+    _log.info("fall through for " + blockRunNumber + ", " + scheduleTime + ", " + serviceDate
+        + " with considered blockIds=" + blockIds);
+    return null;
     
   }
-
-  /**
-   * here we find the (absolute) seconds between scheduleTime and the closest stop on the active trip.
-   * @param blockLocation
-   * @param scheduleTime
-   * @param avlDirection
-   * @param serviceDate
-   * @return
-   */
-  private Long rateBlockLocation(ScheduledBlockLocation blockLocation,
-                                 Long scheduleTime,
-                                 String avlDirection,
-                                 ServiceDate serviceDate) {
-
-    Long closestStopDelta = null;
-    List<StopTimeEntry> stopTimes = blockLocation.getActiveTrip().getTrip().getStopTimes();
-    for (StopTimeEntry stopTime : stopTimes) {
-      long delta = stopTime.getArrivalTime() * 1000 + serviceDate.getAsDate().getTime() - scheduleTime;
-      if (closestStopDelta == null || delta < closestStopDelta) {
-        closestStopDelta = delta;
-      }
-    }
-    return Math.abs(closestStopDelta);
-  }
-
+  
   ScheduledBlockLocation findBestBlockLocation(BlockInstance instance, String avlDirection, int secondsIntoDay, int recursionCount) {
     ScheduledBlockLocation blockLocation = _blockLocationService.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
     if (blockLocation == null) return null;
