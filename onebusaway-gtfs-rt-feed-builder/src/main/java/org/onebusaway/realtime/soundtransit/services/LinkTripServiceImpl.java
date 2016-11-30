@@ -61,7 +61,7 @@ import com.google.transit.realtime.GtfsRealtime.TripDescriptor.ScheduleRelations
 import org.springframework.scheduling.annotation.Scheduled;
 
 public class LinkTripServiceImpl implements LinkTripService {
-  private static final int MAX_RECURSE = 20;
+  private static final int MAX_RECURSE = 80;
   private static Logger _log = LoggerFactory.getLogger(LinkTripServiceImpl.class);
   private long timeToUpdateTripIds = 0;
   private static int TRIP_CUTOVER_HOUR = 3; // Trips starting before this hour
@@ -516,7 +516,7 @@ public class LinkTripServiceImpl implements LinkTripService {
             + " contradicts feed direction of " + avlDirection);
         // recurse going back in time 5 minutes
         if (recursionCount > MAX_RECURSE) {
-          _log.error("infinite recursion detected for trip + " + blockLocation.getActiveTrip().getTrip());
+          _log.error("infinite recursion (" + MAX_RECURSE + ") detected for trip + " + blockLocation.getActiveTrip().getTrip());
           return null;
         }
         recursionCount++;
