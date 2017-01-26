@@ -80,7 +80,8 @@ public class LinkTripServiceImpl implements LinkTripService {
   private String _agencyId;
   private Integer _linkRouteKey = null;
   private static Integer DEFAULT_LINK_ROUTE_KEY = 599;
-  private boolean _overrideScheduleTime = true; 
+  private boolean _overrideScheduleTime = true;
+  private boolean _interpolateUnscheduledTrips = true;
 
   
   private Integer getLinkRouteKey() {
@@ -154,7 +155,11 @@ public class LinkTripServiceImpl implements LinkTripService {
   public void setOverrideScheduleTime(boolean override) {
     _overrideScheduleTime = override;
   }
-  
+
+  public void setInterpolateUnscheduledTrips(boolean interpolate) {
+    _interpolateUnscheduledTrips = interpolate;
+  }
+
   @Override
   public void updateTripsAndStops() {
     // Check if date has changed.
@@ -359,9 +364,17 @@ public class LinkTripServiceImpl implements LinkTripService {
     if (timeUpdate == null) return null;
     Long scheduledTime = avlParseService.parseAvlTimeAsMillis(timeUpdate.getArrivalTime().getScheduled());
     if (scheduledTime == 0) {
-      // we are unscheduled/off schedule, use lastUpdated so we can map to active trip/block
-      _log.info("found illegal schedule time=" + timeUpdate.getArrivalTime().getScheduled() + " for update=" + timeUpdate);
-      return lastUpdatedInSeconds * 1000;
+      if (_interpolateUnscheduledTrips) {
+        // we are unscheduled/off schedule, use lastUpdated so we can map to active trip/block
+        _log.info("found illegal schedule time=" + timeUpdate.getArrivalTime().getScheduled() + " for update="
+                + timeUpdate + ", guessing at now");
+        return lastUpdatedInSeconds * 1000;
+      } else {
+        // when configured, discard unscheduled trips as we may guess wrong!
+        _log.info("found illegal schedule time=" + timeUpdate.getArrivalTime().getScheduled() + " for update="
+                + timeUpdate + ", discarding");
+        return null;
+      }
     }
     
     if (_overrideScheduleTime && Math.abs(scheduledTime - System.currentTimeMillis()) > 2 * 60 *60 *1000) {

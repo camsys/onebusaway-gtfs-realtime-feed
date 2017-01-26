@@ -34,7 +34,7 @@ public class LinkGtfsAdaptorTest {
   private LinkGtfsAdaptor l;
   @Before
   public void setup() throws Exception {
-    l = new LinkGtfsAdaptor("LinkJune2016", "20160623");
+    l = new LinkGtfsAdaptor("LinkJun2016", "20160623");
   }
   @Test
   public void testIsActiveServiceId() throws Exception {
