@@ -151,10 +151,12 @@ public class TUFeedBuilderScheduleServiceImpl {
    */
   private boolean hasPredictions(TripInfo trip) {
     boolean foundNullSchedule = false;
-    for (StopUpdate su : trip.getStopUpdates().getUpdates()) {
-      if (su.getArrivalTime().getActual() == null) {
-        foundNullSchedule = true;
-        break;
+    if (trip != null && trip.getStopUpdates() != null && trip.getStopUpdates().getUpdates() != null) {
+      for (StopUpdate su : trip.getStopUpdates().getUpdates()) {
+        if (su.getArrivalTime().getActual() == null) {
+          foundNullSchedule = true;
+          break;
+        }
       }
     }
     return foundNullSchedule;
