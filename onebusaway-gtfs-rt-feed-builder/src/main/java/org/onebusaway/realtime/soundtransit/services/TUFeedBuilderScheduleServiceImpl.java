@@ -95,7 +95,7 @@ public class TUFeedBuilderScheduleServiceImpl {
             continue;
           }
           if (!hasPredictions(trip)) {
-            _log.info("ignorning historical record for trip " + trip.getVehicleId());
+            _log.info("ignoring historical record for trip " + trip.getVehicleId() + " for train " + trip.getTrainId());
             continue;
           }
           entity.setId(trip.getVehicleId());
