@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 public class LinkJun2016Test extends AbstractFeedBuilderTest {
 
     public LinkJun2016Test() throws Exception {
-        super("LinkJun2016", "20160623", null);
+        super("LinkJun2016", "20160623", null, true);
     }
 
     @Test

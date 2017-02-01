@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2016 Cambridge Systematics, Inc.
+ * Copyright (C) 2017 Cambridge Systematics, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,38 +21,37 @@ import org.onebusaway.gtfs.model.Block;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 
 import java.io.IOException;
+import java.util.Date;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Test with nothing to do.
+ * OldTranNo.txt contains two records that occur in the past, and more
+ * importantly, have actual times populated.  Verify no predections are
+ * generated.
  */
-public class LinkDec2016TestNoSchedule extends AbstractFeedBuilderTest {
+public class LinkDec2016TestOldTrainNo extends AbstractFeedBuilderTest {
 
-    public LinkDec2016TestNoSchedule() throws Exception {
-        super("LinkDec2016", "20170125", null, false);
+
+    public LinkDec2016TestOldTrainNo() throws Exception {
+        super("LinkDec2016", "20170131", null, false);
     }
 
 
-    /**
-     * Test receiving actual in the past, estimated in the past, and non-sensical scheduled
-     * @throws ClassNotFoundException
-     * @throws IOException
-     */
+
     @Test
     public void testBuildScheduleFeedMessage() throws ClassNotFoundException, IOException {
         // this data is based off of KCM "12/2/2016  4:46 PM     17602061 google_daily_transit_2016_12_02.zip"
-        LinkAVLData linkAVLData = avldp.parseAVLDataFromFile("src/test/resources/LinkAvlData_LinkDec2016_NoSchedule.txt");
+        LinkAVLData linkAVLData = avldp.parseAVLDataFromFile("src/test/resources/LinkAvlData_LinkDec2016_OldTrainNo.txt");
         assertNotNull(linkAVLData);
 
         _feedService.setFrequencySchedule("false");
         GtfsRealtime.FeedMessage feedMessage = _feedService.buildTUMessage(linkAVLData);
         assertNotNull(feedMessage);
-        // we don't generate a prediction for this case
         assertEquals(0, feedMessage.getEntityCount());
 
     }
-
 }
+

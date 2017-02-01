@@ -12,12 +12,12 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Created by sbrown on 1/26/17.
+ * Very similar to OldTrainNo, verify no predictions are generated from this sample.
  */
 public class LinkDec2016TestNoPrediction extends AbstractFeedBuilderTest {
 
     public LinkDec2016TestNoPrediction() throws Exception {
-        super("LinkDec2016", "20170125",  1485394320000l);
+        super("LinkDec2016", "20170125",  1485394320000l, false);
     }
 
     @Test

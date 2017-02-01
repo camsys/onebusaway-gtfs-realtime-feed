@@ -36,6 +36,7 @@ public class AVLDataParser {
   
   public static final String LINK_AVL_DATA_1 = "src/test/resources/LinkAvlData.txt";
   public static final String LINK_AVL_DATA_2 = "src/test/resources/LinkAvlData_2.txt";
+  public static final String LEGACY_STOP_MAPPING_FILE = "src/test/resources/LegacyLinkStopMapping.txt";
   public static final String STOP_MAPPING_FILE = "src/test/resources/LinkStopMapping.txt";
   
   private static final Logger _log = LoggerFactory.getLogger(AVLDataParser.class);

@@ -61,7 +61,7 @@ public abstract class AbstractFeedBuilderTest {
   protected Long _referenceTime = null;
   
 
-  public AbstractFeedBuilderTest(String bundleDir, String serviceDateStr, Long referenceTime) throws Exception {
+  public AbstractFeedBuilderTest(String bundleDir, String serviceDateStr, Long referenceTime, boolean legacyStopMapping) throws Exception {
     _referenceTime = referenceTime;
     ga = new LinkGtfsAdaptor(bundleDir, serviceDateStr);
     
@@ -92,7 +92,11 @@ public abstract class AbstractFeedBuilderTest {
     TransitGraphDao _transitGraphDao = Mockito.mock(TransitGraphDao.class);
     linkTripService.setTransitGraphDao(_transitGraphDao);
     LinkStopServiceImpl linkStopService = new LinkStopServiceImpl();
-    linkStopService.setStopMapping(avldp.buildStopMapping(AVLDataParser.STOP_MAPPING_FILE));
+    if (legacyStopMapping) {
+      linkStopService.setStopMapping(avldp.buildStopMapping(AVLDataParser.LEGACY_STOP_MAPPING_FILE));
+    } else {
+      linkStopService.setStopMapping(avldp.buildStopMapping(AVLDataParser.STOP_MAPPING_FILE));
+    }
     linkStopService.setNbStopOffsets(avldp.buildNbStopOffsets());
     linkStopService.setSbStopOffsets(avldp.buildSbStopOffsets());
     impl.setLinkStopServiceImpl(linkStopService);
