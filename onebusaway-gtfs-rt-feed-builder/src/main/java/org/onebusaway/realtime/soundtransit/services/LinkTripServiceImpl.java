@@ -15,7 +15,29 @@
  */
 package org.onebusaway.realtime.soundtransit.services;
 
-import static org.onebusaway.transit_data_federation.testing.UnitTestingSupport.blockConfiguration;
+import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
+import com.google.transit.realtime.GtfsRealtime.TripDescriptor.ScheduleRelationship;
+import org.onebusaway.geospatial.model.CoordinatePoint;
+import org.onebusaway.gtfs.model.AgencyAndId;
+import org.onebusaway.gtfs.model.calendar.LocalizedServiceId;
+import org.onebusaway.gtfs.model.calendar.ServiceDate;
+import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
+import org.onebusaway.realtime.soundtransit.model.StopOffset;
+import org.onebusaway.realtime.soundtransit.model.StopUpdate;
+import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
+import org.onebusaway.realtime.soundtransit.model.TripInfo;
+import org.onebusaway.transit_data_federation.services.blocks.BlockInstance;
+import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
+import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.BlockEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.BlockTripEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.FrequencyEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.ServiceIdActivation;
+import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
+import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -28,37 +50,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import org.onebusaway.geospatial.model.CoordinatePoint;
-import org.onebusaway.gtfs.model.AgencyAndId;
-import org.onebusaway.gtfs.model.calendar.LocalizedServiceId;
-import org.onebusaway.gtfs.model.calendar.ServiceDate;
-import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
-import org.onebusaway.realtime.soundtransit.model.StopOffset;
-import org.onebusaway.realtime.soundtransit.model.StopUpdate;
-import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
-import org.onebusaway.realtime.soundtransit.model.TripInfo;
-import org.onebusaway.transit_data_federation.services.ExtendedCalendarService;
-import org.onebusaway.transit_data_federation.services.blocks.BlockCalendarService;
-import org.onebusaway.transit_data_federation.services.blocks.BlockGeospatialService;
-import org.onebusaway.transit_data_federation.services.blocks.BlockInstance;
-import org.onebusaway.transit_data_federation.services.blocks.BlockRunService;
-import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
-import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocationService;
-import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
-import org.onebusaway.transit_data_federation.services.transit_graph.BlockEntry;
-import org.onebusaway.transit_data_federation.services.transit_graph.BlockTripEntry;
-import org.onebusaway.transit_data_federation.services.transit_graph.FrequencyEntry;
-import org.onebusaway.transit_data_federation.services.transit_graph.ServiceIdActivation;
-import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
-import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
-import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-
-import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
-import com.google.transit.realtime.GtfsRealtime.TripDescriptor.ScheduleRelationship;
-import org.springframework.scheduling.annotation.Scheduled;
+import static org.onebusaway.transit_data_federation.testing.UnitTestingSupport.blockConfiguration;
 
 public class LinkTripServiceImpl implements LinkTripService {
   private static final int MAX_RECURSE = 80;
@@ -66,16 +58,13 @@ public class LinkTripServiceImpl implements LinkTripService {
   private long timeToUpdateTripIds = 0;
   private static int TRIP_CUTOVER_HOUR = 3; // Trips starting before this hour
                                             // will be set to the previous day
-  private TransitGraphDao _transitGraphDao;
-  private ExtendedCalendarService _calendarService;
+
+  private TransitDataServiceFacade _tdsf;
+
   private LinkStopService _linkStopService;
   private List<TripEntry> tripEntries;
   private static String _linkRouteId;
   private AvlParseService avlParseService = new AvlParseServiceImpl();
-  private BlockCalendarService _blockCalendarService;
-  private ScheduledBlockLocationService _blockLocationService;
-  private BlockRunService _blockRunService;
-  private BlockGeospatialService _blockGeospatialService;
   private String _defaultAgencyId = "40";
   private String _agencyId;
   private Integer _linkRouteKey = null;
@@ -83,7 +72,11 @@ public class LinkTripServiceImpl implements LinkTripService {
   private boolean _overrideScheduleTime = true;
   private boolean _interpolateUnscheduledTrips = true;
 
-  
+  @Autowired
+  public void setTransitDataServiceFacade(TransitDataServiceFacade tds) {
+    _tdsf = tds;
+  }
+
   private Integer getLinkRouteKey() {
     if (_linkRouteKey == null) {
       return DEFAULT_LINK_ROUTE_KEY;
@@ -109,40 +102,15 @@ public class LinkTripServiceImpl implements LinkTripService {
     this.timeToUpdateTripIds = timeToUpdateTripIds;
   }
 
-  @Autowired
-  public void setTransitGraphDao(TransitGraphDao transitGraphDao) {
-    _transitGraphDao = transitGraphDao;
-  }
 
-  @Autowired
-  public void setCalendarService(ExtendedCalendarService calendarService) {
-    _calendarService = calendarService;
-  }
-  
-  @Autowired
-  public void setScheduledBlockLocationService(ScheduledBlockLocationService blockLocationService) {
-    _blockLocationService = blockLocationService;
-  }
 
   @Autowired
   public void setLinkStopServiceImpl(LinkStopService linkStopService) {
     _linkStopService = linkStopService;
   }
   
-  @Autowired
-  public void setBlockCalendarService(BlockCalendarService blockCalendarService) {
-    _blockCalendarService = blockCalendarService;
-  }
-  
-  @Autowired
-  public void setBlockRunSerivce(BlockRunService blockRunService) {
-    _blockRunService = blockRunService;
-  }
-  
-  @Autowired
-  public void setBlockGeospatialService(BlockGeospatialService blockGeospatialService) {
-    _blockGeospatialService = blockGeospatialService;
-  }
+
+
 
   public void setTripEntries(List<TripEntry> tripEntries) {  // For JUnit tests
     this.tripEntries = tripEntries;
@@ -184,7 +152,7 @@ public class LinkTripServiceImpl implements LinkTripService {
   
   private List<TripEntry> getLinkTrips() {
     String routeId = _linkRouteId;
-    List<TripEntry> allTrips = _transitGraphDao.getAllTrips();
+    List<TripEntry> allTrips = _tdsf.getAllTrips();
     List<TripEntry> linkTrips = new ArrayList<TripEntry>();
     for (TripEntry trip : allTrips) {
       if (trip.getRoute().getId().getId().equals(routeId)) {
@@ -192,15 +160,13 @@ public class LinkTripServiceImpl implements LinkTripService {
         BlockEntry blockEntry = trip.getBlock();
         List<BlockConfigurationEntry> bceList = blockEntry.getConfigurations();
         LocalizedServiceId serviceId = trip.getServiceId();
-        Set<Date> activeDates = _calendarService.getDatesForServiceIds(new ServiceIdActivation(serviceId));
+        Set<Date> activeDates = _tdsf.getDatesForServiceIds(serviceId);
         Calendar today = Calendar.getInstance();
         today.set(Calendar.HOUR_OF_DAY, 0);
         today.set(Calendar.MINUTE, 0);
         today.set(Calendar.SECOND, 0);
         today.set(Calendar.MILLISECOND, 0);
-        boolean isActiveToday = 
-            _calendarService.areServiceIdsActiveOnServiceDate(
-                new ServiceIdActivation(serviceId), today.getTime());
+        boolean isActiveToday = _tdsf.areServiceIdsActiveOnServiceDate(serviceId, today.getTime());
         if (isActiveToday) {
           linkTrips.add(trip);
         }
@@ -432,10 +398,11 @@ public class LinkTripServiceImpl implements LinkTripService {
         continue;
       }
       try {
-        instance = _blockCalendarService.getBlockInstance(blockId, serviceDate.getAsDate().getTime());
+        instance = _tdsf.getBlockInstance(blockId, serviceDate.getAsDate().getTime());
       } catch (Throwable t) {
+        _log.error("getBlockInstance failed", t);
         _log.error("invalid blockId=" + blockId + " for blockRunNumber=" 
-            + blockRunNumber + ", scheduleTime=" + scheduleTime 
+            + blockRunNumber + ", scheduleTime=" + new Date(scheduleTime)
             + ", serviceDate=" + serviceDate);
         continue;
       }
@@ -519,17 +486,19 @@ public class LinkTripServiceImpl implements LinkTripService {
   }
 
   ScheduledBlockLocation findBestBlockLocation(BlockInstance instance, String avlDirection, int secondsIntoDay, int recursionCount) {
-    ScheduledBlockLocation blockLocation = _blockLocationService.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
+    ScheduledBlockLocation blockLocation = _tdsf.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
     if (blockLocation == null) return null;
     if (avlDirection != null) {
+      _log.info("bi " + instance.getBlock().getTrips() + " found trip= " + blockLocation.getActiveTrip().getTrip()
+          + " and direction=" + blockLocation.getActiveTrip().getTrip().getDirectionId());
       String locDirection = blockLocation.getActiveTrip().getTrip().getDirectionId();
       if (!matchesDirection(avlDirection, locDirection)) {
         // log potential schedule mismatches (GTFS out of sync with feed)
-        _log.debug("trip " + blockLocation.getActiveTrip().getTrip().getId() + " direction of " + locDirection
+        _log.info("trip " + blockLocation.getActiveTrip().getTrip().getId() + " direction of " + locDirection
             + " contradicts feed direction of " + avlDirection);
         // recurse going back in time 5 minutes
         if (recursionCount > MAX_RECURSE) {
-          _log.error("infinite recursion (" + MAX_RECURSE + ") detected for trip + " + blockLocation.getActiveTrip().getTrip());
+          _log.error("infinite recursion (" + MAX_RECURSE + ") detected for trip " + blockLocation.getActiveTrip().getTrip());
           return null;
         }
         recursionCount++;
@@ -559,7 +528,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     List<AgencyAndId> agencyBlockIds = new ArrayList<AgencyAndId>();
     
     try {
-      List<Integer> blockIds = _blockRunService.getBlockIds(getLinkRouteKey(), Integer.parseInt(blockRunNumber));
+      List<Integer> blockIds = _tdsf.getBlockIds(getLinkRouteKey(), Integer.parseInt(blockRunNumber));
       if (blockIds == null) {
         _log.debug("missing blockId for " + getLinkRouteKey() + " / " + blockRunNumber);
         return null;
@@ -698,7 +667,7 @@ public class LinkTripServiceImpl implements LinkTripService {
 
   @Override
   public String getTripDirectionFromTripId(String tripId) {
-    TripEntry trip = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
+    TripEntry trip = _tdsf.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
     if (trip == null) return null;
     return trip.getDirectionId();
   }
@@ -714,7 +683,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     
     Long scheduledTime = avlParseService.parseAvlTimeAsMillis(stopTimeUpdate.getArrivalTime().getScheduled());
     String gtfsStopId = _linkStopService.getGTFSStop(stopTimeUpdate.getStopId(), getTripDirection(trip));
-    TripEntry tripEntry = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
+    TripEntry tripEntry = _tdsf.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
 
     // unit tests don't have a populated transit graph so fall back on scheduled time from feed
     if (tripEntry != null) {
@@ -749,7 +718,7 @@ public class LinkTripServiceImpl implements LinkTripService {
   @Override
   public Integer calculateEffectiveScheduleDeviation(TripInfo trip, String tripId, ServiceDate serviceDate, long lastUpdatedInSeconds) {
     try {
-      TripEntry tripEntry = _transitGraphDao.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
+      TripEntry tripEntry = _tdsf.getTripEntryForId(new AgencyAndId(getAgencyId(), tripId));
       
       // Unit tests: no transit graph. Fall back to delay.
       if (tripEntry == null || trip.getLat() == null || trip.getLon() == null) {
@@ -771,7 +740,8 @@ public class LinkTripServiceImpl implements LinkTripService {
       Long effSchedTimeSec = getEffectiveScheduleTime(trip, tripEntry, lat, lon, time, serviceDateTime);
       if (effSchedTimeSec == null) return null;
       long effSchedTime = effSchedTimeSec + (serviceDateTime/1000);
-      
+      _log.debug("deviation= (updateTime=" + new Date(time*1000) + ") - (effectiveTime="
+              + new Date(effSchedTime*1000) + ") = " + (time - effSchedTime) +"s");
       return (int) (time - effSchedTime);
     } catch (Exception any) {
       _log.error("exception processing effective schedule for trip " + trip, any);
@@ -785,10 +755,15 @@ public class LinkTripServiceImpl implements LinkTripService {
     BlockConfigurationEntry blockConfig = blockConfiguration(trip.getBlock(), serviceIds, trip);
     BlockInstance block = new BlockInstance(blockConfig, serviceDate);
     CoordinatePoint location = new CoordinatePoint(lat, lon);
-     
-    ScheduledBlockLocation loc = _blockGeospatialService.getBestScheduledBlockLocationForLocation(
+    _log.info("bestLocation(0," + trip.getTotalTripDistance() + ")");
+    ScheduledBlockLocation loc = _tdsf.getBestScheduledBlockLocationForLocation(
         block, location, timestamp, 0, trip.getTotalTripDistance());
     if (loc != null && loc.getActiveTrip() != null) {
+      _log.debug("return scheduleTime of " + loc.getScheduledTime()
+              + " (" + new Date( serviceDate + loc.getScheduledTime() * 1000) + ")"
+              + " for trip=" + trip.getId()
+              + " lat=" + lat + ", lon=" + lon + ", scheduleTime=" + timestamp
+              + ", totalTripDistance=" + trip.getTotalTripDistance());
       return (long) loc.getScheduledTime();
     }
     return null;

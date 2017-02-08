@@ -13,21 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onebusaway.realtime.soundtransit.services;
-
-import static org.junit.Assert.*;
-
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+package org.onebusaway.realtime.soundtransit.services.test;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.onebusaway.gtfs.model.AgencyAndId;
 import org.onebusaway.gtfs.model.Block;
 import org.onebusaway.gtfs.model.ServiceCalendar;
 import org.onebusaway.gtfs.model.Trip;
 import org.onebusaway.gtfs.model.calendar.ServiceDate;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class LinkGtfsAdaptorTest {
   
@@ -99,7 +100,7 @@ public class LinkGtfsAdaptorTest {
     b = l.filterActiveBlock(blocks, serviceDate);
     assertNotNull(b); // weekday active on Thursday
 
-    
+    // TODO: test calendar exception support
   }
 
   @Test
@@ -114,13 +115,5 @@ public class LinkGtfsAdaptorTest {
     // weekday service
     calendar = l.getCalendarByServiceId("64700");
     assertTrue(l.isDayActive(calendar, serviceDate));
-  }
-  
-  @Test
-  public void testFindBestTrip() throws Exception {
-    ServiceDate serviceDate = ServiceDate.parseString("20160623");
-    assertNotNull("block 4237414 not active on scheduleTime of " 
-    + new Date(1466694600000l) + " and serviceDate=" + serviceDate,
-    l.findBestTrip("4237414", 1466694600000l, serviceDate));
   }
 }

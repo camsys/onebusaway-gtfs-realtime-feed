@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onebusaway.realtime.soundtransit.services;
+package org.onebusaway.realtime.soundtransit.services.test;
 
 import static org.junit.Assert.*;
 
 import java.util.Date;
 
 import org.junit.Test;
+import org.onebusaway.realtime.soundtransit.services.AvlParseServiceImpl;
 
 public class AvlParseServiceImplTest {
 
   
-  private static AvlParseServiceImpl impl = new AvlParseServiceImpl(); 
+  private static AvlParseServiceImpl impl = new AvlParseServiceImpl();
   
   @Test
   public void testParseAvlTime() {

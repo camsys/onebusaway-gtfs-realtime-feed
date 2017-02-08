@@ -19,6 +19,7 @@ import com.google.transit.realtime.GtfsRealtime;
 import org.junit.Test;
 import org.onebusaway.gtfs.model.Block;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import org.onebusaway.realtime.soundtransit.services.test.AbstractFeedBuilderTest;
 
 import java.io.IOException;
 import java.util.Date;
@@ -29,12 +30,14 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * This train was renumbered, and hence has a missing actual in the first record.
- * However, this record occurs in the past and should not generate a prediction.
+ * However, this stop update occurs in the past and should not generate a prediction.
+ * There are valid predictions in the remaining stop updates however.
+ * Based on sample1.json provided 2017-01-31.
  */
-public class LinkDec2016TestRenumberedTrain extends AbstractFeedBuilderTest {
+public class LinkDec2016RenumberedTrainTest extends AbstractFeedBuilderTest {
 
 
-    public LinkDec2016TestRenumberedTrain() throws Exception {
+    public LinkDec2016RenumberedTrainTest() throws Exception {
         super("LinkDec2016", "20170131", null, false);
     }
 
@@ -57,7 +60,7 @@ public class LinkDec2016TestRenumberedTrain extends AbstractFeedBuilderTest {
         assertEquals(linkAVLData.getTrips().getTrips().get(0).getVehicleId(), e1.getId());
         assertTrue(e1.hasTripUpdate());
         assertTrue(e1.getTripUpdate().hasDelay());
-        assertEquals(33, e1.getTripUpdate().getDelay());
+
         assertTrue(e1.getTripUpdate().hasTrip());
 
 
@@ -71,8 +74,11 @@ public class LinkDec2016TestRenumberedTrain extends AbstractFeedBuilderTest {
         assertTrue(td1.hasTripId());
         Block b = ga.getBlockForRun(linkAVLData.getTrips().getTrips().get(0).getTripId().split(":")[0], ga.getServiceDate());
         assertEquals(4383160, b.getBlockSequence());
-        // tripId "1: 6" has run of 1 and via block.txt has block of 4237416
         assertEquals("31922401", td1.getTripId());
+
+        // predicted=2017-01-31T12:19:55.000-08:00 - scheduled=2017-01-31T12:19:39.000-08:00 for future stop
+        assertEquals(27, e1.getTripUpdate().getDelay());
+
         // we want multiple updates!
         assertEquals(13, e1.getTripUpdate().getStopTimeUpdateCount());
         GtfsRealtime.TripUpdate.StopTimeUpdate e1st1 = e1.getTripUpdate().getStopTimeUpdateList().get(0);
@@ -86,6 +92,6 @@ public class LinkDec2016TestRenumberedTrain extends AbstractFeedBuilderTest {
         // make sure our last record is for Angle Lake
         int count = e1.getTripUpdate().getStopTimeUpdateCount();
         GtfsRealtime.TripUpdate.StopTimeUpdate e1stx = e1.getTripUpdate().getStopTimeUpdate(count-1);
-        assertEquals("99913", e1stx.getStopId());
+        assertTrue("99913".equals(e1stx.getStopId()) || "99914".equals(e1stx.getStopId()));
     }
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onebusaway.realtime.soundtransit.services;
+package org.onebusaway.realtime.soundtransit.services.test;
 
 import static org.junit.Assert.assertTrue;
 
@@ -29,6 +29,7 @@ import java.util.Map;
 
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
+import org.onebusaway.realtime.soundtransit.services.FeedService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -33,6 +33,9 @@ import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.realtime.soundtransit.model.TripInfoList;
 
+/**
+ * Exercise the AVL Parser verifying some basic functionality.
+ */
 public class FeedServiceParseAvlTest {
   
   private static final String LINK_AVL_DATA_1 = "src/test/resources/LinkAvlData.txt";

@@ -13,11 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onebusaway.realtime.soundtransit.services;
+package org.onebusaway.realtime.soundtransit.services.test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import com.google.transit.realtime.GtfsRealtime.FeedEntity;
+import com.google.transit.realtime.GtfsRealtime.FeedMessage;
+import org.mockito.Mockito;
+import org.onebusaway.gtfs.model.AgencyAndId;
+import org.onebusaway.gtfs.model.Block;
+import org.onebusaway.gtfs.model.StopTime;
+import org.onebusaway.gtfs.model.Trip;
+import org.onebusaway.gtfs.model.calendar.ServiceDate;
+import org.onebusaway.realtime.soundtransit.services.AvlParseService;
+import org.onebusaway.realtime.soundtransit.services.AvlParseServiceImpl;
+import org.onebusaway.realtime.soundtransit.services.FeedServiceImpl;
+import org.onebusaway.realtime.soundtransit.services.LinkStopServiceImpl;
+import org.onebusaway.realtime.soundtransit.services.LinkTripServiceImpl;
+import org.onebusaway.realtime.soundtransit.services.TUFeedBuilderComponent;
+import org.onebusaway.realtime.soundtransit.services.TUFeedBuilderScheduleServiceImpl;
+import org.onebusaway.realtime.soundtransit.services.TUFeedBuilderServiceImpl;
+import org.onebusaway.transit_data_federation.impl.blocks.BlockRunServiceImpl;
+import org.onebusaway.transit_data_federation.services.FederatedTransitDataBundle;
+import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
+import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
+import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,27 +46,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-import org.junit.Before;
-import org.junit.Test;
-import org.mockito.Mockito;
-import org.onebusaway.gtfs.model.AgencyAndId;
-import org.onebusaway.gtfs.model.Block;
-import org.onebusaway.gtfs.model.StopTime;
-import org.onebusaway.gtfs.model.Trip;
-import org.onebusaway.gtfs.model.calendar.ServiceDate;
-import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
-import org.onebusaway.transit_data_federation.impl.blocks.BlockRunServiceImpl;
-import org.onebusaway.transit_data_federation.services.FederatedTransitDataBundle;
-import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
-import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
-import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
-
-import com.google.transit.realtime.GtfsRealtime.FeedEntity;
-import com.google.transit.realtime.GtfsRealtime.FeedMessage;
-import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
-import com.google.transit.realtime.GtfsRealtime.TripUpdate.StopTimeUpdate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.junit.Assert.assertNotNull;
 
 public abstract class AbstractFeedBuilderTest {
 
@@ -78,19 +78,21 @@ public abstract class AbstractFeedBuilderTest {
     blockRunService.setBundle(bundle);
     blockRunService.setup();
     buildRunBlocks(blockRunService);
-    
-    LinkTripServiceImpl linkTripService = new TestLinkTripServiceImpl(ga, _referenceTime);
+
+    GtfsTransitDataServiceFacade tds = new GtfsTransitDataServiceFacade(ga, serviceDateStr, _referenceTime);
+    LinkTripServiceImpl linkTripService = new LinkTripServiceImpl();
+    linkTripService.setTransitDataServiceFacade(tds);
     linkTripService.setOverrideScheduleTime(false);
     
     _feedService = new FeedServiceImpl();
     _feedService.setAvlParseService(avlParseService);
     _feedService.setTuFeedBuilderServiceImpl(impl);
     avldp = new AVLDataParser(_feedService);
-    
-    linkTripService.setBlockRunSerivce(blockRunService);
+
+
     linkTripService.setTimeToUpdateTripIds(Long.MAX_VALUE); //To prevent update
     TransitGraphDao _transitGraphDao = Mockito.mock(TransitGraphDao.class);
-    linkTripService.setTransitGraphDao(_transitGraphDao);
+
     LinkStopServiceImpl linkStopService = new LinkStopServiceImpl();
     if (legacyStopMapping) {
       linkStopService.setStopMapping(avldp.buildStopMapping(AVLDataParser.LEGACY_STOP_MAPPING_FILE));
@@ -156,90 +158,4 @@ public abstract class AbstractFeedBuilderTest {
   public void testBuildScheduleFeedMessage2() {
   }
 
-  // override the lookups to not need a bundle, but to use the GTFS instead
-  protected static class TestLinkTripServiceImpl extends LinkTripServiceImpl {
-    private LinkGtfsAdaptor ga;
-    private Long referenceTime = null;
-    public TestLinkTripServiceImpl(LinkGtfsAdaptor ga, Long aReferenceTime) {
-      referenceTime = aReferenceTime;
-      this.ga = ga;
-    }
-
-
-    ScheduledBlockLocation lookupBlockLocation(String blockRunNumber, Long scheduleTime, String avlDirection, ServiceDate serviceDate) {
-      int scheduleOffset = (int) (scheduleTime - serviceDate.getAsDate().getTime())/1000;
-      Block b = ga.getBlockForRun(blockRunNumber, serviceDate);
-      assertNotNull(b);
-      Trip trip = ga.getTripByBlockId("" + b.getId());
-      int lastArrivalOffset = Integer.MAX_VALUE;
-      for (StopTime st : ga.getStopTimesForTripId(trip.getId().getId())) {
-        if (st.isArrivalTimeSet() 
-            && st.getArrivalTime() < lastArrivalOffset 
-            && st.getArrivalTime() < scheduleOffset) {
-          lastArrivalOffset = st.getArrivalTime();
-        }
-      }
-      
-      ScheduledBlockLocation sbl = new ScheduledBlockLocation();
-      sbl.setNextStopTimeOffset(lastArrivalOffset);
-      return sbl;
-    }
-    
-
-    // override lookupTrip to not require a bundle
-    String lookupTripByRunId(String blockRunStr, Long scheduleTime, String avlDirection, ServiceDate serviceDate) {
-      if (scheduleTime == null) {
-        // unscheduled -- abort!
-        return null;
-      }
-      // if schedule time is nonsense use reference time
-      if (referenceTime != null) {
-        if (Math.abs(scheduleTime - referenceTime) > 2 * 60 * 60 * 1000);
-        _log.error("ignoring scheduleTime of " + new Date(scheduleTime) + ", using "
-                + new Date(referenceTime));
-        scheduleTime = referenceTime;
-      }
-      assertTrue("something is wrong with blockRunStr " + blockRunStr,
-          !scheduleTime.equals(new Long(0L)));
-      return lookupTripByRunId(blockRunStr, scheduleTime,
-              avlDirection, serviceDate, 0);
-
-    }
-
-    String lookupTripByRunId(String blockRunStr, Long scheduleTime, String avlDirection, ServiceDate serviceDate, int recurse) {
-      if (recurse > 100) {
-        _log.error("infinite recurse for blockRunStr=" + blockRunStr
-                + " ended with scheduleTime=" + new Date(scheduleTime));
-        return null;
-      }
-      List<AgencyAndId> blockIds = lookupBlockIds(blockRunStr);
-      assertNotNull("expected block for run " + blockRunStr, blockIds);
-      assertTrue(blockIds.size() > 0);
-      String debugBlockId = "";
-      String tripId = null;
-      for (AgencyAndId agencyBlockId : blockIds) {
-        String blockId = agencyBlockId.getId();
-        debugBlockId += blockId + ", ";
-        tripId = verifyTrip(blockId, scheduleTime, serviceDate);
-        if (tripId != null) break; // we found it
-      }
-      if (tripId == null)
-        return lookupTripByRunId(blockRunStr, scheduleTime - 5*60*1000, avlDirection, serviceDate,recurse+1);
-      // make sure we always find a trip from the above map
-      // TODO: this assertion makes time zone assumptions
-//      assertNotNull("blockId= " + debugBlockId + ", "
-//                      + "blockRun=" + blockRunStr
-//                      + " and scheduleTime="
-//                      + scheduleTime + " (" + new Date(scheduleTime) + ")"
-//              , tripId);
-      return tripId.toString();
-    }
-
-      protected String verifyTrip(String blockId, Long scheduleTime, ServiceDate serviceDate) {
-      _log.debug("verifyTrip for blockId=" + blockId + " on " + new Date(scheduleTime));
-      AgencyAndId gtfsTripId = ga.findBestTrip(blockId, scheduleTime, serviceDate);
-      if (gtfsTripId == null) return null;
-      return gtfsTripId.getId();
-    }
-  }
 }

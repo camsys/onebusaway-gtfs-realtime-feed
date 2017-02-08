@@ -13,10 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.onebusaway.realtime.soundtransit.services;
+package org.onebusaway.realtime.soundtransit.services.test;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import org.onebusaway.gtfs.impl.GtfsRelationalDaoImpl;
+import org.onebusaway.gtfs.model.AgencyAndId;
+import org.onebusaway.gtfs.model.Block;
+import org.onebusaway.gtfs.model.ServiceCalendar;
+import org.onebusaway.gtfs.model.ServiceCalendarDate;
+import org.onebusaway.gtfs.model.ShapePoint;
+import org.onebusaway.gtfs.model.StopTime;
+import org.onebusaway.gtfs.model.Trip;
+import org.onebusaway.gtfs.model.calendar.ServiceDate;
+import org.onebusaway.gtfs.serialization.GtfsReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -25,20 +35,11 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
 
-import org.onebusaway.gtfs.impl.GtfsRelationalDaoImpl;
-import org.onebusaway.gtfs.model.AgencyAndId;
-import org.onebusaway.gtfs.model.Block;
-import org.onebusaway.gtfs.model.ServiceCalendar;
-import org.onebusaway.gtfs.model.StopTime;
-import org.onebusaway.gtfs.model.Trip;
-import org.onebusaway.gtfs.model.calendar.ServiceDate;
-import org.onebusaway.gtfs.serialization.GtfsReader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * Block/run/trip mapping using raw GTFS that TUFeeBuilder uses the bundle for. 
@@ -46,13 +47,15 @@ import org.slf4j.LoggerFactory;
  */
 public class LinkGtfsAdaptor {
 
+  public static final int CALENDAR_EXCEPTION_ADD = 1;
   private static final Logger _log = LoggerFactory.getLogger(LinkGtfsAdaptor.class);
   private GtfsRelationalDaoImpl dao = new GtfsRelationalDaoImpl();
   private ServiceDate serviceDate;
   
   public LinkGtfsAdaptor(String bundleDir, String serviceDateStr) throws Exception {
     serviceDate = ServiceDate.parseString(serviceDateStr);
-    
+
+    _log.debug("bundDir=" + bundleDir + " for class=" + getClass().getName());
     String gtfs = getClass().getResource(bundleDir).getFile();
     GtfsReader reader = new GtfsReader();
     
@@ -72,7 +75,8 @@ public class LinkGtfsAdaptor {
   public Collection<Block> getAllBlocks() {
     return dao.getAllBlocks();
   }
-  
+  public Collection<Trip> getAllTrips() { return dao.getAllTrips(); }
+
   public Trip getTripById(String tripId) {
     for (Trip trip : dao.getAllTrips()) {
       if (trip.getId() != null && trip.getId().getId().equals(tripId)) {
@@ -83,14 +87,22 @@ public class LinkGtfsAdaptor {
     return null;
   }
 
-  public Trip getTripByBlockId(String blockId) {
+  public Trip getFirstTrip(String blockId) {
+    // here we assume the lowest numerical trip is the first trip in the block
+    int lowestTrip = Integer.MAX_VALUE;
+    Trip selectedTrip = null;
     for (Trip trip : dao.getAllTrips()) {
-      if (trip.getBlockId() != null && trip.getBlockId().equals(blockId)) {
-        return trip;
+      if (trip.getBlockId() != null
+              && trip.getBlockId().equals(blockId)
+              && Integer.parseInt(trip.getId().getId()) < lowestTrip) {
+        lowestTrip = Integer.parseInt(trip.getId().getId());
+        selectedTrip = trip;
       }
     }
-    fail("missing trip for blockId=" + blockId);
-    return null;
+    if (selectedTrip == null)
+      fail("missing trip for blockId=" + blockId);
+
+    return selectedTrip;
   }
 
   public List<StopTime> getStopTimesForTripId(String tripId) {
@@ -116,6 +128,7 @@ public class LinkGtfsAdaptor {
     int blockRun = Integer.parseInt(blockRunNumber);
     for (Block block : dao.getAllBlocks()) {
       if (block.getBlockRun() == blockRun && block.getBlockRoute() == 599) {
+        _log.debug("potential block=" + block.getBlockSequence() + "/" + block.getBlockRun());
         blocks.add(block);
       }
     }
@@ -143,14 +156,49 @@ public class LinkGtfsAdaptor {
     }
     return null;
   }
-  
-  Block filterActiveBlock(List<Block> blocks, ServiceDate serviceDate) {
-    for (Block block : blocks) {
-      Trip trip = getTripByBlockId("" + block.getBlockSequence());
-      if (isActiveServiceId(trip, serviceDate)) {
-        return block;
+
+  public ServiceCalendarDate getCalendarException(String serviceId, long serviceDate) {
+    for (ServiceCalendarDate calendarDates : dao.getAllCalendarDates()) {
+      if (serviceId.equals(calendarDates.getServiceId().getId())) {
+
+        long exceptionTime = calendarDates.getDate().getAsDate().getTime();
+        if (serviceId.equals(calendarDates.getServiceId().getId())
+                && exceptionTime == serviceDate
+                && CALENDAR_EXCEPTION_ADD  == calendarDates.getExceptionType()) {
+          return calendarDates;
+        }
       }
     }
+    return null;
+  }
+
+
+  public List<ShapePoint> getShapePointsForId(AgencyAndId id) {
+    return dao.getShapePointsForShapeId(id);
+  }
+
+  Block filterActiveBlock(List<Block> blocks, ServiceDate serviceDate) {
+    for (Block block : blocks) {
+      Trip trip = getFirstTrip("" + block.getBlockSequence());
+      _log.debug("firstTrip=" + trip + " for block=" + block.getBlockSequence());
+      if (isActiveServiceId(trip, serviceDate)) {
+        return block;
+      } else {
+        /* check for an exception on that service id.
+         *  As with GtfsTransitDataServiceFacade, this logic isn't exactly
+         *  correct but should be close enough for integration tests.
+         */
+        ServiceCalendarDate calendarException = getCalendarException(
+                trip.getServiceId().getId(),
+                serviceDate.getAsDate().getTime());
+        if (calendarException != null) {
+          _log.debug("exception match for block=" + block.getBlockSequence());
+          return block;
+        }
+        _log.debug("trip " + trip + " not active on " + serviceDate);
+      }
+    }
+
     return null; // not found
   }
 
@@ -163,6 +211,8 @@ public class LinkGtfsAdaptor {
       // we are in the correct range, need to verify the day
       if (isDayActive(calendar, serviceDate)) {
         return true;
+      } else {
+        _log.debug("day check failed");
       }
     }
     return false;
@@ -200,46 +250,5 @@ public class LinkGtfsAdaptor {
     }
     return false;
   } 
-
-  
-  public AgencyAndId findBestTrip(String blockId, Long scheduleTime, ServiceDate serviceDate) {
-    for (Trip trip : dao.getAllTrips()) {
-      if (trip.getBlockId() != null && trip.getBlockId().equals(blockId)) {
-        if (this.isActiveServiceId(trip, serviceDate)) {
-          List<StopTime> stopTimes = getStopTimesForTripId(trip.getId().getId());
-          verifyStopTimes(stopTimes);
-          Long firstStopTime = stopTimes.get(0).getArrivalTime() * 1000 + serviceDate.getAsDate().getTime();
-          Long lastStopTime = stopTimes.get(stopTimes.size()-1).getArrivalTime() * 1000 + serviceDate.getAsDate().getTime();
-          assertTrue(firstStopTime < lastStopTime);
-          Long window = 5 * 60 * 1000l; // no overlap
-          if (scheduleTime >= firstStopTime - window && scheduleTime <= lastStopTime + window) {
-            return trip.getId();
-          } else {
-            _log.debug("no trip found for " + blockId + " on serviceDate=" + serviceDate
-                + " with " + new Date(firstStopTime) + " <= " + new Date(scheduleTime) + " <= " + new Date(lastStopTime));
-          }
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private void verifyStopTimes(List<StopTime> stopTimes) {
-    int min = Integer.MIN_VALUE;
-    for (StopTime st : stopTimes) {
-      if (st.getArrivalTime() > min) {
-        min = st.getArrivalTime();
-      } else {
-        fail("stop times not in increasing order, last=" + min
-            + ", current=" + st.getArrivalTime());
-      }
-    }
-  }
-
-  long parseTime(String dateStr) throws Exception {
-    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-    return sdf.parse(dateStr).getTime();
-  }
 
 }

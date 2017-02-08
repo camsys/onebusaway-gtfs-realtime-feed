@@ -17,16 +17,10 @@ package org.onebusaway.realtime.soundtransit.services;
 
 import static org.junit.Assert.*;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,6 +33,7 @@ import org.mockito.Mockito;
 import org.onebusaway.gtfs.model.AgencyAndId;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
+import org.onebusaway.realtime.soundtransit.services.test.AVLDataParser;
 import org.onebusaway.transit_data_federation.impl.transit_graph.BlockConfigurationEntryImpl;
 import org.onebusaway.transit_data_federation.impl.transit_graph.BlockEntryImpl;
 import org.onebusaway.transit_data_federation.impl.transit_graph.FrequencyEntryImpl;
@@ -56,6 +51,10 @@ import com.google.transit.realtime.GtfsRealtime.FeedMessage;
 import com.google.transit.realtime.GtfsRealtime.TripUpdate;
 import com.google.transit.realtime.GtfsRealtime.VehiclePosition;
 
+/**
+ * Excercise the FeedService by having it generated some predictions/GTFS-RT.
+ * This test class has been superseded by integration tests of type LinkMMMYYYYFileNameTest.java.
+ */
 public class FeedServiceBuildMessageTest {
 
   private static final Logger _log = LoggerFactory.getLogger(FeedServiceParseAvlTest.class);
@@ -80,7 +79,7 @@ public class FeedServiceBuildMessageTest {
   @BeforeClass
   public static void setUpBeforeClass() throws Exception {
     _feedService = new FeedServiceImpl();
-    AVLDataParser avldp = new AVLDataParser(_feedService);  // TODO this is a circular dependency!
+    AVLDataParser avldp = new AVLDataParser(_feedService);
     _transitGraphDao = Mockito.mock(TransitGraphDao.class);
     List<TripEntry> allTrips = buildTripsForFrequencyTrips();
     Mockito.when(_transitGraphDao.getAllTrips()).thenReturn(allTrips);
@@ -96,7 +95,6 @@ public class FeedServiceBuildMessageTest {
 
     linkTripService = new LinkTripServiceImpl();
     linkTripService.setTimeToUpdateTripIds(Long.MAX_VALUE); //To prevent update
-    linkTripService.setTransitGraphDao(_transitGraphDao);
     linkTripService.setLinkStopServiceImpl(spyLinkStopService);
     linkTripService.setLinkRouteId("100479");
     linkTripService.setTripEntries(allTrips);

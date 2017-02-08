@@ -10,6 +10,9 @@
 	<name>onebusaway-gtfs-rt-feed-builder</name>
 	<packaging>war</packaging>
 
+	<properties>
+		<oba.version>1.1.15.37-cs-SNAPSHOT</oba.version>
+	</properties>
 	<dependencies>
 		<dependency>
 		  <groupId>javax.servlet</groupId>
@@ -22,17 +25,17 @@
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-transit-data-federation</artifactId>
-			<version>1.1.15.34-cs</version>
+			<version>${oba.version}</version>
 		</dependency>
 	    <dependency>
 	      <groupId>org.onebusaway</groupId>
 	      <artifactId>onebusaway-container</artifactId>
-	      <version>1.1.15.34-cs</version>
+	      <version>${oba.version}</version>
 	    </dependency>
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-util</artifactId>
-			<version>1.1.15.34-cs</version>
+			<version>${oba.version}</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>slf4j-api</artifactId>
@@ -60,12 +63,12 @@
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-geospatial</artifactId>
-			<version>1.1.15.34-cs</version>
+			<version>${oba.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.onebusaway</groupId>
 			<artifactId>onebusaway-api-core</artifactId>
-			<version>1.1.15.34-cs</version>
+			<version>${oba.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>

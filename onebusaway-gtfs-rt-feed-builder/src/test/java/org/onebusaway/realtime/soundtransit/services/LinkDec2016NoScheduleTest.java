@@ -17,21 +17,22 @@ package org.onebusaway.realtime.soundtransit.services;
 
 import com.google.transit.realtime.GtfsRealtime;
 import org.junit.Test;
-import org.onebusaway.gtfs.model.Block;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import org.onebusaway.realtime.soundtransit.services.test.AbstractFeedBuilderTest;
 
 import java.io.IOException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /**
- * Test with nothing to do.
+ * Test with nothing to do.  That is, all stops have been visited, the
+ * train has completed its trip and the feed is displaying historical data,
+ * no predictions.
  */
-public class LinkDec2016TestNoSchedule extends AbstractFeedBuilderTest {
+public class LinkDec2016NoScheduleTest extends AbstractFeedBuilderTest {
 
-    public LinkDec2016TestNoSchedule() throws Exception {
+    public LinkDec2016NoScheduleTest() throws Exception {
         super("LinkDec2016", "20170125", null, false);
     }
 

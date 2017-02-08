@@ -17,25 +17,24 @@ package org.onebusaway.realtime.soundtransit.services;
 
 import com.google.transit.realtime.GtfsRealtime;
 import org.junit.Test;
-import org.onebusaway.gtfs.model.Block;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import org.onebusaway.realtime.soundtransit.services.test.AbstractFeedBuilderTest;
 
 import java.io.IOException;
-import java.util.Date;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * OldTranNo.txt contains two records that occur in the past, and more
- * importantly, have actual times populated.  Verify no predections are
+ * importantly, have actual times populated.  Verify no predictions are
  * generated.
+ * Based on sample2.json provided 2017-01-31.
  */
-public class LinkDec2016TestOldTrainNo extends AbstractFeedBuilderTest {
+public class LinkDec2016OldTrainNoTest extends AbstractFeedBuilderTest {
 
 
-    public LinkDec2016TestOldTrainNo() throws Exception {
+    public LinkDec2016OldTrainNoTest() throws Exception {
         super("LinkDec2016", "20170131", null, false);
     }
 
