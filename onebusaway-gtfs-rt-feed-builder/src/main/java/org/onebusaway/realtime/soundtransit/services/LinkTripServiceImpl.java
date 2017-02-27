@@ -481,7 +481,7 @@ public class LinkTripServiceImpl implements LinkTripService {
       String locDirection = blockLocation.getActiveTrip().getTrip().getDirectionId();
       if (!matchesDirection(avlDirection, locDirection)) {
         // log potential schedule mismatches (GTFS out of sync with feed)
-        _log.info("trip " + blockLocation.getActiveTrip().getTrip().getId() + " direction of " + locDirection
+        _log.debug("trip " + blockLocation.getActiveTrip().getTrip().getId() + " direction of " + locDirection
             + " contradicts feed direction of " + avlDirection);
         // recurse going back in time 5 minutes
         if (recursionCount > MAX_RECURSE) {

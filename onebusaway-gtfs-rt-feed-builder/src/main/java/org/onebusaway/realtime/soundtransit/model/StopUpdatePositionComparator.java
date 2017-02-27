@@ -67,7 +67,7 @@ public class StopUpdatePositionComparator implements Comparator<StopUpdate> {
         if (!cache.containsKey(hash(stopId))) {
             cache.put(hash(stopId), countIndex(stopId));
         }
-        _log.info("position(" + stopId + ")=" + cache.get(hash(stopId)));
+        _log.debug("position(" + stopId + ")=" + cache.get(hash(stopId)));
         return cache.get(hash(stopId));
     }
 
@@ -76,7 +76,7 @@ public class StopUpdatePositionComparator implements Comparator<StopUpdate> {
     }
 
     public int countIndex(String avlStopId) {
-        _log.info("countIndex(" + avlStopId + ")(" + _direction + ")");
+        _log.debug("countIndex(" + avlStopId + ")(" + _direction + ")");
         if (isNorthBound(_direction)) {
             for (StopOffset nb : _offsets.getNbStopOffsets()) {
                 if (avlStopId.equals(nb.getLinkStopId()))

@@ -190,6 +190,24 @@ public class AvlParseServiceImpl implements AvlParseService {
     return vehicleId;
   }
 
+@Override
+  /*
+  * look for predictions (null actual arrival times)
+   */
+  public boolean hasPredictions(TripInfo trip) {
+    boolean foundNullSchedule = false;
+    if (trip != null && trip.getStopUpdates() != null && trip.getStopUpdates().getUpdates() != null) {
+      for (StopUpdate su : trip.getStopUpdates().getUpdates()) {
+        if (su.getArrivalTime().getActual() == null) {
+          foundNullSchedule = true;
+          break;
+        }
+      }
+    }
+    return foundNullSchedule;
+}
+
+
 
   public long parseAvlTimeAsMillis(String arrivalTime) {
     Date d = parseAvlTime(arrivalTime);

@@ -73,6 +73,10 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         if (updateList == null || updateList.size() < 2) {
           continue;
         }
+        if (!_avlParseService.hasPredictions(trip)) {
+          // ignore historical records
+          continue;
+        }
         VehiclePosition.Builder vp = VehiclePosition.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
@@ -146,7 +150,7 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
     return vehiclePositionsFM;
     
   }
-  
+
   @Override
   public FeedMessage buildFrequencyFeedMessage(LinkAVLData linkAVLData) {
     return buildFeedMessage(linkAVLData);

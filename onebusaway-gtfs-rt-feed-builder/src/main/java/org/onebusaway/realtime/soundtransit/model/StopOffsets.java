@@ -98,7 +98,7 @@ public class StopOffsets {
 
 
     public void addStopOffset(String gtfsStopId, String avlStopId, String direction, int arrivalTime) {
-        _log.info("add(gtfs=" + gtfsStopId
+        _log.debug("add(gtfs=" + gtfsStopId
         + ", avl=" + avlStopId
         + ", direction=" + direction
         + ", arrivalTime=" + arrivalTime);
@@ -161,7 +161,7 @@ public class StopOffsets {
             String gtfsStopId = stopTimeEntry.getStop().getId().getId().toString();
             String avlStopId = stopMapper.getAVLStopId(gtfsStopId, "1");
             int arrivalTime = stopTimeEntry.getArrivalTime();
-            _log.info("GTFS/AVL id: " + gtfsStopId + " / " + avlStopId + " / " + arrivalTime);
+            _log.debug("GTFS/AVL id: " + gtfsStopId + " / " + avlStopId + " / " + arrivalTime);
             addStopOffset(gtfsStopId, avlStopId, "1", arrivalTime);
         }
 

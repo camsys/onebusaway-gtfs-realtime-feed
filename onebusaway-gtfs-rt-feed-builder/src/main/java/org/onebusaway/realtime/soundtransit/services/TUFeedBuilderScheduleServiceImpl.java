@@ -95,7 +95,7 @@ public class TUFeedBuilderScheduleServiceImpl {
             // we have a ghost train -- nothing to see here
             continue;
           }
-          if (!hasPredictions(trip)) {
+          if (!_avlParseService.hasPredictions(trip)) {
             _log.info("ignoring historical record for trip " + trip.getVehicleId() + " for train " + trip.getTrainId());
             continue;
           }
@@ -145,22 +145,6 @@ public class TUFeedBuilderScheduleServiceImpl {
     } // end if trips != null
     return feedMessageBuilder.build();
 
-  }
-
-  /*
-  * look for predictions (null actual arrival times)
-   */
-  private boolean hasPredictions(TripInfo trip) {
-    boolean foundNullSchedule = false;
-    if (trip != null && trip.getStopUpdates() != null && trip.getStopUpdates().getUpdates() != null) {
-      for (StopUpdate su : trip.getStopUpdates().getUpdates()) {
-        if (su.getArrivalTime().getActual() == null) {
-          foundNullSchedule = true;
-          break;
-        }
-      }
-    }
-    return foundNullSchedule;
   }
 
   // last modified updates on each request, we want it updated only when the data changed
