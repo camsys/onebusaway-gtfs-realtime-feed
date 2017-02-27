@@ -37,11 +37,17 @@ import com.google.transit.realtime.GtfsRealtime.TripDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehicleDescriptor;
 import com.google.transit.realtime.GtfsRealtime.VehiclePosition;
 import com.google.transit.realtime.GtfsRealtime.FeedHeader.Incrementality;
+import org.springframework.beans.factory.annotation.Autowired;
 
 public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
   private static Logger _log = LoggerFactory.getLogger(VPFeedBuilderServiceImpl.class);
-  private AvlParseService avlParseService = new AvlParseServiceImpl();
-  
+  private AvlParseService _avlParseService;
+
+  @Autowired
+  public void setAvlParseService(AvlParseService service) {
+    _avlParseService = service;
+  }
+
   private FeedMessage buildFeedMessage(LinkAVLData linkAVLData) {
     // Update the list of trips (done only if the date has changed
     _linkTripService.updateTripsAndStops();
@@ -70,7 +76,7 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         VehiclePosition.Builder vp = VehiclePosition.newBuilder();
         VehicleDescriptor.Builder vd = VehicleDescriptor.newBuilder();
         Position.Builder positionBuilder = Position.newBuilder();
-        String vehicleId = avlParseService.hashVehicleId(trip.getVehicleId());
+        String vehicleId = _avlParseService.hashVehicleId(trip.getVehicleId());
         if (vehicleId == null) {
           _log.error("encounterd null vehicleId for trip=" + trip + ", discarding");
           continue;
@@ -94,7 +100,7 @@ public class VPFeedBuilderServiceImpl extends FeedBuilderServiceImpl {
         long timestamp = 0L;
         String lastUpdatedDate = trip.getLastUpdatedDate();
         if (lastUpdatedDate != null) {
-          timestamp = avlParseService.parseAvlTimeAsSeconds(lastUpdatedDate);
+          timestamp = _avlParseService.parseAvlTimeAsSeconds(lastUpdatedDate);
         }
         timestamp = timestamp != 0L ? timestamp : System.currentTimeMillis()/1000;
         vp.setTimestamp(timestamp);

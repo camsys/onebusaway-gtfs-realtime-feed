@@ -34,102 +34,75 @@ import java.util.Map;
 import javax.annotation.PostConstruct;
 
 import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
+import org.onebusaway.realtime.soundtransit.model.StopMapper;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
+import org.onebusaway.realtime.soundtransit.model.StopOffsets;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 
 public class LinkStopServiceImpl implements LinkStopService {
   private static Logger _log = LoggerFactory.getLogger(LinkStopServiceImpl.class);
-  private Map<String, String> stopMapping = null; // Link id, Gtfs id
-  private static String _linkStopMappingFile;
-  private List<StopOffset> nbStopOffsets = new ArrayList<StopOffset>();// Northbound
-  private List<StopOffset> sbStopOffsets = new ArrayList<StopOffset>();// Southbound
+
+
+  private StopOffsets stopOffsets = null;
+  private StopMapper stopMapper = null;
 
   public void setStopMapping(Map<String, String> stopMapping) { // For testing
-    this.stopMapping = stopMapping;
+    stopMapper.setStopMapping(stopMapping);
   }
 
   public void setLinkStopMappingFile(String linkStopMappingFile) {
-    _linkStopMappingFile = linkStopMappingFile;
+    stopMapper.setLinkStopMappingFile(linkStopMappingFile);
   }
 
   public void setNbStopOffsets(List<StopOffset> nbStopOffsets) {
-    this.nbStopOffsets = nbStopOffsets;
+    stopOffsets.setNbStopOffsets(nbStopOffsets);
   }
 
   public void setSbStopOffsets(List<StopOffset> sbStopOffsets) {
-    this.sbStopOffsets = sbStopOffsets;
+
+    stopOffsets.setSbStopOffsets(sbStopOffsets);
   }
 
-  @PostConstruct
-  public void init() {
-    // Read in the AVL-GTFS stop mapping file
-    try (BufferedReader br = new BufferedReader(new FileReader(_linkStopMappingFile))) {
-      stopMapping = new HashMap<String, String>();
-      String ln = "";
-      while ((ln = br.readLine()) != null) {
-        _log.info(ln);
-        int idx = ln.indexOf(',');
-        if (idx > 0) {
-          stopMapping.put(ln.substring(0, idx), ln.substring(idx + 1));
-        }
-      }
-    } catch (IOException e) {
-      _log.error("Error reading StopMapping file " + e.getMessage());
-    }
+  @Autowired
+  public void setStopOffsets(StopOffsets stopOffsets) {
+    this.stopOffsets = stopOffsets;
   }
-  
+  public StopOffsets getStopOffsets() {
+    return stopOffsets;
+  }
+
+  public void updateStopOffsets() {
+    stopOffsets.updateStopOffsets(stopMapper);
+  }
+
+  @Autowired
+  public void setStopMapper(StopMapper stopMapper) {
+    this.stopMapper = stopMapper;
+  }
+
   @Override
   public boolean isValidLinkStop(String stopId) {
-    boolean isValid = stopMapping.containsKey(stopId);    
+    boolean isValid = stopMapper.containsKey(stopId);
     return isValid;
   }
 
   @Override
   public String getGTFSStop(String stopId, String direction) {
-    String mappedStopId = "";
-    if (stopId != null) {
-      mappedStopId = stopMapping.get(stopId);
-    }
-
-    if (mappedStopId != null && !mappedStopId.isEmpty()) {
-      // Check for special case at platforms where northbound 
-      // and southbound trains have an AVL stop id of "XXX_PLAT".
-      // TODO: clean this up or move to config
-      // 0 is south, 1 is north
-      // UW
-      if (mappedStopId.equals("99604") || mappedStopId.equals("99605")) {
-        if ("0".equals(direction)) {
-          mappedStopId = "99604";
-        } else {
-          // north bound stop is 99605
-          mappedStopId = "99605";
-        }
-      }
-      // Angle Lake
-      if (mappedStopId.equals("99913") || mappedStopId.equals("99914")) {
-        if ("0".equals(direction)) {
-          mappedStopId = "99914";
-        } else {
-          // north bound stop is 99913
-          mappedStopId = "99913";
-        }
-      }
-
-    }
-    return mappedStopId;
+    return stopMapper.getGTFSStop(stopId, direction);
   }
   
   @Override
   public List<StopOffset> getStopOffsets(String direction) {
     if (direction.equals("0")) {
-      return sbStopOffsets;
+      return stopOffsets.getSbStopOffsets();
     } else {
-      return nbStopOffsets;
+      return stopOffsets.getNbStopOffsets();
     }
   }
 
@@ -138,8 +111,8 @@ public class LinkStopServiceImpl implements LinkStopService {
     // Check the times for the StopUpdates to determine which stop the vehicle
     // will reach next. That will be the stop with the earliest estimated
     // arrival time, but an actual time of null. If the trip is already
-    // completed, i.e. every stop update has an actual arrival time, then an
-    // empty string will be returned.
+    // completed, i.e. every stop update has an actual arrival time, then the
+    // last stop will be returned.
     stopUpdatesList = (stopUpdatesList == null ? 
         (StopUpdatesList)Collections.EMPTY_LIST : stopUpdatesList); //Check for null
     StopUpdate nextStop = null;
@@ -170,7 +143,7 @@ public class LinkStopServiceImpl implements LinkStopService {
               _log.error("Exception parsing Estimated time: " + arrival);
               parsedDate = nextStopTime;
             }
-            if (parsedDate.before(nextStopTime)) {
+            if (nextStopTime == null || parsedDate.after(nextStopTime)) {
               nextStopTime = parsedDate;
               nextStop = stopTimeUpdate;
             }
@@ -178,7 +151,7 @@ public class LinkStopServiceImpl implements LinkStopService {
         }
       }
     }
-    // If all stops have actual arrival times, the trip must have finished, 
+    // If all stops have actual arrival times, the trip must have finished,
     // so use the last stop instead.
     if (nextStop == null) {
       nextStop = lastStop;
@@ -186,105 +159,5 @@ public class LinkStopServiceImpl implements LinkStopService {
     return nextStop;
   }
 
-  public void updateStopOffsets(List<TripEntry> tripEntries) {
-    // Create tables of northbound and southbound stop offsets
-    int sbStopCt = 0;   // Direction = "0"
-    int nbStopCt = 0;   // Direction = "1"
-    TripEntry sbTrip = null;
-    TripEntry nbTrip = null;
-    for (TripEntry trip : tripEntries) {
-      List<StopTimeEntry> stopTimeEntries = trip.getStopTimes();
-      if (trip.getDirectionId().equals("0") && stopTimeEntries.size() > sbStopCt) {
-        sbTrip = trip;
-        sbStopCt = stopTimeEntries.size();
-      } else if (trip.getDirectionId().equals("1") && stopTimeEntries.size() > nbStopCt) {
-        nbTrip = trip;
-        nbStopCt = stopTimeEntries.size();
-      }
-    }
-    if (sbStopCt == 0) {
-      _log.error("No southbound stops found for this route");
-    }
-    if (nbStopCt == 0) {
-      _log.error("No northbound stops found for this route");
-    }
-    if (sbTrip != null && sbTrip.getId() != null)
-    _log.info("Southbound trip " + sbTrip.getId().toString() + " has "
-        + sbStopCt + " stops.");
-    if (nbTrip != null && nbTrip.getId() != null)
-    _log.info("Northbound trip " + nbTrip.getId().toString() + " has "
-        + nbStopCt + " stops.");
-    List<StopTimeEntry> sbStopTimeEntries = new ArrayList<StopTimeEntry>();
-    if (sbTrip != null) {
-      sbStopTimeEntries = sbTrip.getStopTimes();
-    }
-    sbStopOffsets.clear();
-    nbStopOffsets.clear();
-    for (StopTimeEntry stopTimeEntry : sbStopTimeEntries) {
-      String gtfsStopId = stopTimeEntry.getStop().getId().getId().toString();
-      String avlStopId = getAVLStopId(gtfsStopId);
-      int arrivalTime = stopTimeEntry.getArrivalTime();
-      _log.info("GTFS/AVL id: " + gtfsStopId + " / " + avlStopId);
-      sbStopOffsets.add(new StopOffset(gtfsStopId, avlStopId, "0", arrivalTime));
-    }
-    List<StopTimeEntry> nbStopTimeEntries = new ArrayList<StopTimeEntry>();
-    if (nbTrip != null) {
-      nbTrip.getStopTimes();
-    }
-    for (StopTimeEntry stopTimeEntry : nbStopTimeEntries) {
-      String gtfsStopId = stopTimeEntry.getStop().getId().getId().toString();
-      String avlStopId = getAVLStopId(gtfsStopId);
-      int arrivalTime = stopTimeEntry.getArrivalTime();
-      _log.info("GTFS/AVL id: " + gtfsStopId + " / " + avlStopId);
-      nbStopOffsets.add(new StopOffset(gtfsStopId, avlStopId, "1", arrivalTime));
-    }
-    _log.info("***LinkStopService***");
-    if (sbStopOffsets.size() > 0 && nbStopOffsets.size() > 0) {
-      Collections.sort(sbStopOffsets, new StopOffsetComparator());
-      // Adjust offsets, setting first stop to zero and adjusting the others
-      // accordingly.
-      int offsetAdjustment = sbStopOffsets.get(0).getOffset();
-      for (StopOffset so : sbStopOffsets) {
-        so.setOffset(so.getOffset() - offsetAdjustment);
-        _log.info(so.toString());
-      }
-      Collections.sort(nbStopOffsets, new StopOffsetComparator());
-      // Adjust offsets, setting first stop to zero and adjusting the others
-      // accordingly.
-      offsetAdjustment = nbStopOffsets.get(0).getOffset();
-      for (StopOffset so : nbStopOffsets) {
-        so.setOffset(so.getOffset() - offsetAdjustment);
-        _log.info(so.toString());
-      }
-    }
-    return;
-  }
-  
-  private String getAVLStopId(String gtfsStopId) {
-    String result = "";
-    // TODO:  this should come from configuration
-    if (gtfsStopId.equals("99604") || gtfsStopId.equals("99605")) {
-      result = "UWS_PLAT";
-    } else if (gtfsStopId.equals("99913") || gtfsStopId.equals("99914")) {
-      result = "ALS_PLAT";
-    } else {
-      Iterator it = stopMapping.entrySet().iterator();
-      while (it.hasNext()) {
-        Map.Entry<String, String> stopPair = (Map.Entry)it.next();
-        if (stopPair.getValue().equals(gtfsStopId)) {
-          result = stopPair.getKey();
-          break;
-        }
-      }
-    }
-    return result;
-  }
-  
-  private class StopOffsetComparator implements Comparator<StopOffset> {
-    // Compare StopOffsets based on their offset values.
-    @Override
-    public int compare(StopOffset so1, StopOffset so2) {
-      return so1.getOffset() - so2.getOffset();
-    }
-  }
+
 }

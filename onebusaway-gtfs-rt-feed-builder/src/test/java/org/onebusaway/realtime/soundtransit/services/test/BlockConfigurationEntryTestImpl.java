@@ -30,7 +30,7 @@ import java.util.List;
  * methods needed are implemented with remaining ones throwing
  * UnsupportedOperationExceptions.
  */
-public class BlockConfigurationEntryImpl implements BlockConfigurationEntry {
+public class BlockConfigurationEntryTestImpl implements BlockConfigurationEntry {
     @Override
     public BlockEntry getBlock() {
         throw new UnsupportedOperationException("not implemented");
@@ -47,9 +47,13 @@ public class BlockConfigurationEntryImpl implements BlockConfigurationEntry {
         return _trips;
     }
 
+    private List<FrequencyEntry> _frequencies = new ArrayList<FrequencyEntry>();
     @Override
     public List<FrequencyEntry> getFrequencies() {
-        throw new UnsupportedOperationException("not implemented");
+        return _frequencies;
+    }
+    public void setFrequencies(List<FrequencyEntry> f) {
+        _frequencies = f;
     }
 
     @Override
@@ -64,7 +68,7 @@ public class BlockConfigurationEntryImpl implements BlockConfigurationEntry {
 
     @Override
     public int getArrivalTimeForIndex(int i) {
-        throw new UnsupportedOperationException("not implemented");
+        return _stopTimes.get(i).getStopTime().getArrivalTime();
     }
 
     @Override

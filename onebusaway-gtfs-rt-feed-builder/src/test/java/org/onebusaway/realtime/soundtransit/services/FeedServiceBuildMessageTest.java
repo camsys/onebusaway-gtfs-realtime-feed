@@ -31,8 +31,11 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
 import org.onebusaway.gtfs.model.AgencyAndId;
+import org.onebusaway.gtfs.model.calendar.LocalizedServiceId;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import org.onebusaway.realtime.soundtransit.model.StopMapper;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
+import org.onebusaway.realtime.soundtransit.model.StopOffsets;
 import org.onebusaway.realtime.soundtransit.services.test.AVLDataParser;
 import org.onebusaway.transit_data_federation.impl.transit_graph.BlockConfigurationEntryImpl;
 import org.onebusaway.transit_data_federation.impl.transit_graph.BlockEntryImpl;
@@ -61,6 +64,7 @@ public class FeedServiceBuildMessageTest {
   
   private static FeedServiceImpl _feedService = null;
   private static TransitGraphDao _transitGraphDao;
+  private static TransitDataServiceFacadeImpl _tds;
   private static LinkTripServiceImpl linkTripService;
   private static LinkStopServiceImpl linkStopService;
   private static AvlParseServiceImpl avlParseService;
@@ -81,34 +85,51 @@ public class FeedServiceBuildMessageTest {
     _feedService = new FeedServiceImpl();
     AVLDataParser avldp = new AVLDataParser(_feedService);
     _transitGraphDao = Mockito.mock(TransitGraphDao.class);
+
     List<TripEntry> allTrips = buildTripsForFrequencyTrips();
     Mockito.when(_transitGraphDao.getAllTrips()).thenReturn(allTrips);
+
+    _tds = Mockito.mock(TransitDataServiceFacadeImpl.class);
+    Mockito.when(_tds.areServiceIdsActiveOnServiceDate((LocalizedServiceId)Mockito.any(), (Date)Mockito.any())).thenReturn(true);
     stopMapping = avldp.buildStopMapping(AVLDataParser.STOP_MAPPING_FILE);
     nbStopOffsets = avldp.buildNbStopOffsets();
     sbStopOffsets = avldp.buildSbStopOffsets();
+
+    StopMapper stopMapper = new StopMapper();
+    StopOffsets stopOffsets = new StopOffsets();
+
     linkStopService = new LinkStopServiceImpl();
+    linkStopService.setStopOffsets(stopOffsets);
+    linkStopService.setStopMapper(stopMapper);
     linkStopService.setStopMapping(stopMapping);
     linkStopService.setNbStopOffsets(nbStopOffsets);
     linkStopService.setSbStopOffsets(sbStopOffsets);
     LinkStopServiceImpl spyLinkStopService = Mockito.spy(linkStopService);
-    Mockito.doNothing().when(spyLinkStopService).updateStopOffsets(Mockito.any(List.class));
+    Mockito.doNothing().when(spyLinkStopService).updateStopOffsets();
 
     linkTripService = new LinkTripServiceImpl();
     linkTripService.setTimeToUpdateTripIds(Long.MAX_VALUE); //To prevent update
     linkTripService.setLinkStopServiceImpl(spyLinkStopService);
-    linkTripService.setLinkRouteId("100479");
     linkTripService.setTripEntries(allTrips);
+    linkTripService.setTransitDataServiceFacade(_tds);
+
     
     avlParseService = new AvlParseServiceImpl();
+    avlParseService.setTestMode();
+    linkTripService.setAvlParseService(avlParseService);
+
     vpFeedBuilderServiceImpl = new VPFeedBuilderServiceImpl();
     vpFeedBuilderServiceImpl.setLinkTripServiceImpl(linkTripService);
     vpFeedBuilderServiceImpl.setLinkStopServiceImpl(linkStopService);
+    vpFeedBuilderServiceImpl.setAvlParseService(avlParseService);
     TUFeedBuilderComponent comp = new TUFeedBuilderComponent ();
     comp.setLinkStopServiceImpl(linkStopService);
     comp.setLinkTripServiceImpl(linkTripService);
+    comp.setAvlParseService(avlParseService);
     TUFeedBuilderFrequencyServiceImpl impl = new TUFeedBuilderFrequencyServiceImpl();
     impl.setLinkStopServiceImpl(linkStopService);
     impl.setLinkTripServiceImpl(linkTripService);
+    impl.setAvlParseService(avlParseService);
     impl.setTUFeedBuilderComponent(comp);
     tuFeedBuilderServiceImpl = new TUFeedBuilderServiceImpl();
     tuFeedBuilderServiceImpl.setTUFeedBuilderFrequencyServiceImpl(impl);
@@ -121,6 +142,14 @@ public class FeedServiceBuildMessageTest {
     _feedService.setTuFeedBuilderServiceImpl(tuFeedBuilderServiceImpl);
     _feedService.setFrequencySchedule("true");
 
+    stopOffsets.setSbStopOffsets(sbStopOffsets);
+    stopOffsets.setNbStopOffsets(nbStopOffsets);
+    stopMapper.addPlatformDirection("99903_0", "99904");
+    stopMapper.addPlatformDirection("99904_1", "99903");
+    avlParseService.setStopOffsets(stopOffsets);
+    avlParseService.setStopMapper(stopMapper);
+    assertNotNull(linkTripService.getAvlParseService());
+    assertNotNull(linkTripService.getLinkRouteId());
         
     parsedLinkAVLData_1 = avldp.parseAVLDataFromFile(AVLDataParser.LINK_AVL_DATA_1);
     vehiclePositionsFM_1 = _feedService.buildVPMessage(parsedLinkAVLData_1);

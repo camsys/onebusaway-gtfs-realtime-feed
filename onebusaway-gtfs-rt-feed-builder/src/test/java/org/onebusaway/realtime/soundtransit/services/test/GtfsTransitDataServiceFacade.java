@@ -55,6 +55,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 
+import static org.onebusaway.realtime.soundtransit.services.AvlParseServiceImpl.LINK_ROUTE_ID;
+
 /**
  * GTFS-based implementation of TransitDataService methods.
  * Useful for integration tests, they simply need reference
@@ -127,43 +129,73 @@ public class GtfsTransitDataServiceFacade
     public List<ShapePoint> getShapePointsForId(AgencyAndId id) {
         return _ga.getShapePointsForId(id);
     }
+    private List<TripEntry> allTrips = new ArrayList<TripEntry>();
     @Override
     public List<TripEntry> getAllTrips() {
-        throw new UnsupportedOperationException("getAllTrips not implemented");
+        _log.debug("allTrips start");
+        if (allTrips.isEmpty()) {
+            // we really don't want all trips, as we only
+            // know about LINK data
+            // but our GTFS may already be trimmed
+            for (Trip t : _ga.getAllTripsByRouteId(LINK_ROUTE_ID)) {
+
+                allTrips.add(getTripEntryForId(t.getId()));
+            }
+        }
+
+        _log.debug("allTrips end");
+        return allTrips;
     }
 
+    private Map<AgencyAndId, TripEntryTestImpl> _tripCache = new HashMap<AgencyAndId, TripEntryTestImpl>();
     @Override
     public TripEntryTestImpl getTripEntryForId(AgencyAndId id) {
-        TripEntryTestImpl i = new TripEntryTestImpl();
-        Trip trip = _ga.getTripById(id.getId());
-        i.setId(trip.getId());
-        i.setShapeId(trip.getShapeId());
-        i.setDirectionId(mapDirection(trip.getDirectionId()));
-        LocalizedServiceId sid = new LocalizedServiceId(trip.getServiceId(), TimeZone.getDefault());
+        if (!_tripCache.containsKey(id)) {
+            TripEntryTestImpl i = new TripEntryTestImpl();
+            _tripCache.put(id, i);
+            Trip trip = _ga.getTripById(id.getId());
+            i.setId(trip.getId());
+            i.setShapeId(trip.getShapeId());
+            i.setDirectionId(mapDirection(trip.getDirectionId()));
+            LocalizedServiceId sid = new LocalizedServiceId(trip.getServiceId(), TimeZone.getDefault());
 
-        BlockEntryImpl bei = new BlockEntryImpl();
-        bei.setId(new AgencyAndId(id.getAgencyId(), trip.getBlockId()));
-        i.setBlock(bei);
-        double totalTripDistance = 0.0;
+            RouteEntryTestImpl r = new RouteEntryTestImpl();
+            r.setId(trip.getRoute().getId());
+            i.setRouteEntry(r);
+
+            LocalizedServiceId serviceId = new LocalizedServiceId(trip.getServiceId(), TimeZone.getDefault());
+            i.setServiceId(serviceId);
+
+            BlockEntryImpl bei = new BlockEntryImpl();
+            AgencyAndId blockId = new AgencyAndId(id.getAgencyId(), trip.getBlockId());
+            bei.setId(blockId);
+            i.setBlock(bei);
+
+            BlockConfigurationEntry blockConfigurationEntry = getBlock(blockId, i);
+            bei.setConfigurations(new ArrayList<BlockConfigurationEntry>());
+            bei.getConfigurations().add(blockConfigurationEntry);
+
+            double totalTripDistance = 0.0;
 
 
-        for (StopTime stopTime : _ga.getStopTimesForTripId(trip.getId().getId())) {
-            StopTimeEntryImpl se = new StopTimeEntryImpl();
-            se.setArrivalTime(stopTime.getArrivalTime());
-            se.setDepartureTime(stopTime.getDepartureTime());
-            se.setTrip(toTripEntryImpl(i));
-            se.setId(stopTime.getId());
-            se.setStop(toStopEntry(stopTime.getStop()));
-            se.setShapeDistTraveled(toMeters(stopTime.getShapeDistTraveled()));
-            i.getStopTimes().add(se);
-            // KCM GTFS is in ft, TDS is in meters
-            totalTripDistance+=toMeters(stopTime.getShapeDistTraveled());
+            for (StopTime stopTime : _ga.getStopTimesForTripId(trip.getId().getId())) {
+                StopTimeEntryImpl se = new StopTimeEntryImpl();
+                se.setArrivalTime(stopTime.getArrivalTime());
+                se.setDepartureTime(stopTime.getDepartureTime());
+                se.setTrip(toTripEntryImpl(i));
+                se.setId(stopTime.getId());
+                se.setStop(toStopEntry(stopTime.getStop()));
+                se.setShapeDistTraveled(toMeters(stopTime.getShapeDistTraveled()));
+                i.getStopTimes().add(se);
+                // KCM GTFS is in ft, TDS is in meters
+                totalTripDistance += toMeters(stopTime.getShapeDistTraveled());
+            }
+            i.setTotalTripDistance(totalTripDistance);
+
+            assert (i.getStopTimes().get(0).getTrip() != null);
+
         }
-        i.setTotalTripDistance(totalTripDistance);
-
-        assert(i.getStopTimes().get(0).getTrip() != null);
-
-        return i;
+        return _tripCache.get(id);
     }
 
     private double toMeters(double ft) {
@@ -178,8 +210,8 @@ public class GtfsTransitDataServiceFacade
 
     @Override
     public boolean areServiceIdsActiveOnServiceDate(LocalizedServiceId serviceId, Date time) {
-        _log.error("areServiceIdsActiveOnServiceDate called");
-        throw new UnsupportedOperationException("areServiceIdsActiveOnServiceDate not implemented");
+        ServiceCalendar serviceCalendar = _ga.getCalendarByServiceId(serviceId.getId().getId());
+        return isActive(serviceCalendar, time.getTime());
     }
 
     @Override
@@ -190,29 +222,46 @@ public class GtfsTransitDataServiceFacade
         }
         Trip trip = _ga.getFirstTrip(blockId.getId());
         TripEntryTestImpl te = getTripEntryForId(trip.getId());
-        BlockConfigurationEntryImpl bce = new BlockConfigurationEntryImpl();
-
-        BlockTripEntryTestImpl bte = new BlockTripEntryTestImpl();
-
-        bte.setTrip(te);
-        int blockSequence = 0;
-        while (bte != null) {
-            bce.getTrips().add(bte);
-            bce.getStopTimes().addAll(toStopTimes(bte, getStopTimes(bte), blockSequence));
-            _log.debug("looking for next trip after " + bte.getTrip().getId());
-            bte = findNextTrip(bte.getTrip().getId());
-            blockSequence++;
-            if (bte != null && bte.getTrip() != null) {
-                _log.debug("trip=" + te.getId()
-                        + " blockSequence=" + blockSequence
-                        + " nextTrip=" + bte.getTrip().getId());
-            }
-        }
-        _log.debug("block " + blockId + " has trips=" + bce.getTrips());
+        BlockConfigurationEntry bce = getBlock(blockId, te);
         BlockInstance bi = new BlockInstance(bce, serviceDateInMillis);
 
         return bi;
     }
+
+    private String hashBlock(AgencyAndId blockId, TripEntry te) {
+        return blockId.toString() + "_" + te.getId().toString();
+    }
+    private Map<String, BlockConfigurationEntry> blockCache = new HashMap<String, BlockConfigurationEntry>();
+    public BlockConfigurationEntry getBlock(AgencyAndId blockId, TripEntry te) {
+        String key = hashBlock(blockId, te);
+        if (!blockCache.containsKey(key)) {
+            BlockConfigurationEntryTestImpl bce = new BlockConfigurationEntryTestImpl();
+            blockCache.put(key, bce);
+
+            BlockTripEntryTestImpl bte = new BlockTripEntryTestImpl();
+
+            bte.setTrip(te);
+            int blockSequence = 0;
+            while (bte != null) {
+                bce.getTrips().add(bte);
+                bce.getStopTimes().addAll(toStopTimes(bte, getStopTimes(bte), blockSequence));
+                _log.debug("looking for next trip after " + bte.getTrip().getId());
+                bte = findNextTrip(bte.getTrip().getId());
+                blockSequence++;
+                if (bte != null && bte.getTrip() != null) {
+                    _log.debug("trip=" + te.getId()
+                            + " blockSequence=" + blockSequence
+                            + " nextTrip=" + bte.getTrip().getId());
+                }
+            }
+            _log.debug("block " + te.getBlock().getId() + " has trips=" + bce.getTrips());
+
+        }
+        BlockConfigurationEntry entry = blockCache.get(key);
+        assert(entry.getTrips().get(0).getTrip().getId().equals(te.getId()));
+        return entry;
+    }
+
     public List<BlockStopTimeEntry> toStopTimes(BlockTripEntryTestImpl bte, List<StopTime> stopTimes, int blockSequence) {
         List<BlockStopTimeEntry> entries = new ArrayList<BlockStopTimeEntry>();
 
@@ -256,11 +305,15 @@ public class GtfsTransitDataServiceFacade
         return i;
     }
     private boolean isActive(AgencyAndId blockId, long serviceDateInMillis) {
-        Calendar c = Calendar.getInstance();
-        c.setTimeInMillis(serviceDateInMillis);
         Trip trip = _ga.getFirstTrip(blockId.getId());
         AgencyAndId serviceId = trip.getServiceId();
         ServiceCalendar serviceCalendar = _ga.getCalendarByServiceId(serviceId.getId());
+        return isActive(serviceCalendar, serviceDateInMillis);
+    }
+
+    private boolean isActive(ServiceCalendar serviceCalendar, long serviceDateInMillis) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(serviceDateInMillis);
 
         if (serviceCalendar.getStartDate().getAsDate().getTime() > serviceDateInMillis) {
             _log.debug("calendar " + serviceCalendar + " rejected as startDate beyond serviceDate "

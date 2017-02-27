@@ -25,6 +25,7 @@ import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
+import org.onebusaway.realtime.soundtransit.model.TripComparator;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.transit_data_federation.services.blocks.BlockInstance;
 import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
@@ -63,8 +64,8 @@ public class LinkTripServiceImpl implements LinkTripService {
 
   private LinkStopService _linkStopService;
   private List<TripEntry> tripEntries;
-  private static String _linkRouteId;
-  private AvlParseService avlParseService = new AvlParseServiceImpl();
+  private AvlParseService avlParseService = null;
+  TripComparator tripComparator = new TripComparator();
   private String _defaultAgencyId = "40";
   private String _agencyId;
   private Integer _linkRouteKey = null;
@@ -75,6 +76,11 @@ public class LinkTripServiceImpl implements LinkTripService {
   @Autowired
   public void setTransitDataServiceFacade(TransitDataServiceFacade tds) {
     _tdsf = tds;
+  }
+
+  @Autowired
+  public void setAvlParseService(AvlParseService service) {
+    avlParseService = service;
   }
 
   private Integer getLinkRouteKey() {
@@ -108,18 +114,11 @@ public class LinkTripServiceImpl implements LinkTripService {
   public void setLinkStopServiceImpl(LinkStopService linkStopService) {
     _linkStopService = linkStopService;
   }
-  
-
-
 
   public void setTripEntries(List<TripEntry> tripEntries) {  // For JUnit tests
     this.tripEntries = tripEntries;
   }
 
-  public void setLinkRouteId(String linkRouteId) {
-    _linkRouteId = linkRouteId;
-  }
-  
   public void setOverrideScheduleTime(boolean override) {
     _overrideScheduleTime = override;
   }
@@ -128,57 +127,44 @@ public class LinkTripServiceImpl implements LinkTripService {
     _interpolateUnscheduledTrips = interpolate;
   }
 
+  public AvlParseService getAvlParseService() {
+    return avlParseService;
+  }
+
+  public String getLinkRouteId() {
+    return avlParseService.getLinkRouteId();
+  }
+
   @Override
   public void updateTripsAndStops() {
     // Check if date has changed.
     // If it has, update the trips ids so they are valid for this service date
-    if ((new Date()).getTime() > timeToUpdateTripIds 
+    if ((new Date()).getTime() > timeToUpdateTripIds
         || tripEntries == null || tripEntries.size() == 0) {
       tripEntries = getLinkTrips();
-      Calendar nextUpdate = Calendar.getInstance();  // Start with today
-      nextUpdate.set(Calendar.HOUR_OF_DAY, 0);
-      nextUpdate.set(Calendar.MINUTE, 0);
-      nextUpdate.set(Calendar.SECOND, 0);
-      nextUpdate.set(Calendar.MILLISECOND, 0);
-      nextUpdate.add(Calendar.DATE, 1);   // Set to tomorrow at 3AM
-      nextUpdate.add(Calendar.HOUR_OF_DAY, TRIP_CUTOVER_HOUR);
+
+      Calendar nextUpdate = getNextUpdate();
       timeToUpdateTripIds = nextUpdate.getTimeInMillis();
       SimpleDateFormat sdf = new SimpleDateFormat("YYYY-MM-dd HH:mm:ss");
       _log.info("List of GTFS trips updated.  Will next be updated after " 
           + sdf.format(new Date(timeToUpdateTripIds)));
-      _linkStopService.updateStopOffsets(tripEntries);
+      _linkStopService.updateStopOffsets();
     }
   }
-  
+
+  private Calendar getNextUpdate() {
+    Calendar nextUpdate = Calendar.getInstance();  // Start with today
+    nextUpdate.set(Calendar.HOUR_OF_DAY, 0);
+    nextUpdate.set(Calendar.MINUTE, 0);
+    nextUpdate.set(Calendar.SECOND, 0);
+    nextUpdate.set(Calendar.MILLISECOND, 0);
+    nextUpdate.add(Calendar.DATE, 1);   // Set to tomorrow at 3AM
+    nextUpdate.add(Calendar.HOUR_OF_DAY, TRIP_CUTOVER_HOUR);
+    return nextUpdate;
+  }
+
   private List<TripEntry> getLinkTrips() {
-    String routeId = _linkRouteId;
-    List<TripEntry> allTrips = _tdsf.getAllTrips();
-    List<TripEntry> linkTrips = new ArrayList<TripEntry>();
-    for (TripEntry trip : allTrips) {
-      if (trip.getRoute().getId().getId().equals(routeId)) {
-        // Check if this trip has a service id that is valid for today.
-        BlockEntry blockEntry = trip.getBlock();
-        List<BlockConfigurationEntry> bceList = blockEntry.getConfigurations();
-        LocalizedServiceId serviceId = trip.getServiceId();
-        Set<Date> activeDates = _tdsf.getDatesForServiceIds(serviceId);
-        Calendar today = Calendar.getInstance();
-        today.set(Calendar.HOUR_OF_DAY, 0);
-        today.set(Calendar.MINUTE, 0);
-        today.set(Calendar.SECOND, 0);
-        today.set(Calendar.MILLISECOND, 0);
-        boolean isActiveToday = _tdsf.areServiceIdsActiveOnServiceDate(serviceId, today.getTime());
-        if (isActiveToday) {
-          linkTrips.add(trip);
-        }
-      }
-    }
-    TripComparator tripComparator = new TripComparator();
-    Collections.sort(linkTrips, tripComparator);
-    for (TripEntry trip : linkTrips) {
-      _log.info("Trip " + trip.getId().toString());
-    }
-    
-    return linkTrips;
+    return _linkStopService.getStopOffsets().getLinkTrips();
   }
 
   @Override
@@ -270,7 +256,8 @@ public class LinkTripServiceImpl implements LinkTripService {
       mappedStopId = _linkStopService.getGTFSStop(stopId, direction);
     }
     String direction = getTripDirection(trip);
-    String tripId = getTripForStop(mappedStopId, direction, scheduledTime);
+    // trip for stop needs to consider service date
+    String tripId = getTripForStop(mappedStopId, direction, scheduledTime, avlParseService.parseAvlTimeAsMillis(trip.getLastUpdatedDate()));
     if (tripId == null) {
       tripId = "";
     }
@@ -297,7 +284,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     }
     td.setTripId(tripId);
     td.setScheduleRelationship(ScheduleRelationship.SCHEDULED);
-    td.setRouteId(_linkRouteId);
+    td.setRouteId(getLinkRouteId());
     
     return td.build();
   }
@@ -489,7 +476,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     ScheduledBlockLocation blockLocation = _tdsf.getScheduledBlockLocationFromScheduledTime(instance.getBlock(), secondsIntoDay);
     if (blockLocation == null) return null;
     if (avlDirection != null) {
-      _log.info("bi " + instance.getBlock().getTrips() + " found trip= " + blockLocation.getActiveTrip().getTrip()
+      _log.debug("bi " + instance.getBlock().getTrips() + " found trip= " + blockLocation.getActiveTrip().getTrip()
           + " and direction=" + blockLocation.getActiveTrip().getTrip().getDirectionId());
       String locDirection = blockLocation.getActiveTrip().getTrip().getDirectionId();
       if (!matchesDirection(avlDirection, locDirection)) {
@@ -551,7 +538,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     return null;
   }
 
-  private String getTripForStop(String stopId, String direction, int scheduledTime) {
+  private String getTripForStop(String stopId, String direction, int scheduledTime, long serviceDateInMillis) {
     int offset = 0;
     List<StopOffset> stopOffsets = null;
     stopOffsets = _linkStopService.getStopOffsets(direction);
@@ -571,8 +558,14 @@ public class LinkTripServiceImpl implements LinkTripService {
         }
         continue;
       }
+
+      boolean isActiveToday = _tdsf.areServiceIdsActiveOnServiceDate(gtfsTripEntry.getServiceId(), new Date(serviceDateInMillis));
+      if (!isActiveToday) {
+        _log.debug("discarding trip " + gtfsTripEntry.getId() + " as it is not active on serviceDate " + new Date(serviceDateInMillis));
+        continue;
+      }
       //int startTimeInSecs = getTripStartTimeInSecs(tripEntry);
-      if (tripStartTime < getTripStartTimeInSecs(gtfsTripEntry)) {
+      if (tripStartTime < tripComparator.getTripStartTimeInSecs(gtfsTripEntry)) {
         if (lastTrip != null) {
           tripId = lastTrip.getId().getId();
         } else {  // Earlier than the first entry, so just use the first stop.
@@ -624,46 +617,6 @@ public class LinkTripServiceImpl implements LinkTripService {
     return tripStartTime;
   }
   
-  private class TripComparator implements Comparator<TripEntry> {
-
-    @Override
-    public int compare(TripEntry t1, TripEntry t2) {
-      // Compare direction
-      if (!t1.getDirectionId().equals(t2.getDirectionId())) {
-        if (t1.getDirectionId().equals("0")) {    // Outbound, to the airport
-          return -1;
-        } else {
-          return 1;
-        }
-      }
-      // Compare trip start times
-      int time1 = getTripStartTimeInSecs(t1);
-      int time2 = getTripStartTimeInSecs(t2);
-      if (time1 != time2) {
-        if (time1 < time2) {
-          return -1;
-        } else {
-          return 1;
-        }
-      }
-      return 0;
-    }
-  }
-
-  // Returns the start time in seconds of the trip
-  private int getTripStartTimeInSecs(TripEntry trip) {
-    int startTime = 0;
-    List<BlockConfigurationEntry> blocks = trip.getBlock().getConfigurations();
-    if (blocks.size() > 0) {
-      List<FrequencyEntry> frequencies = blocks.get(0).getFrequencies();
-      if (frequencies != null && frequencies.size() > 0) {
-        startTime = frequencies.get(0).getStartTime();
-      } else {
-        startTime = blocks.get(0).getArrivalTimeForIndex(0);
-      }
-    }
-    return startTime;
-  }
 
   @Override
   public String getTripDirectionFromTripId(String tripId) {
@@ -755,7 +708,7 @@ public class LinkTripServiceImpl implements LinkTripService {
     BlockConfigurationEntry blockConfig = blockConfiguration(trip.getBlock(), serviceIds, trip);
     BlockInstance block = new BlockInstance(blockConfig, serviceDate);
     CoordinatePoint location = new CoordinatePoint(lat, lon);
-    _log.info("bestLocation(0," + trip.getTotalTripDistance() + ")");
+    _log.debug("bestLocation(0," + trip.getTotalTripDistance() + ")");
     ScheduledBlockLocation loc = _tdsf.getBestScheduledBlockLocationForLocation(
         block, location, timestamp, 0, trip.getTotalTripDistance());
     if (loc != null && loc.getActiveTrip() != null) {

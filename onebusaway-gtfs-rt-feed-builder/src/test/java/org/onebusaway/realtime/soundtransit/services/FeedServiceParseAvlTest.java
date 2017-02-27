@@ -51,6 +51,7 @@ public class FeedServiceParseAvlTest {
   public static void setUpBeforeClass() throws Exception {
     _feedService = new FeedServiceImpl();
     avlParseService = new AvlParseServiceImpl();
+    avlParseService.setTestMode();
     _feedService.setAvlParseService(avlParseService);
 
     parsedLinkAVLData_1 = parseAVLDataFromFile(LINK_AVL_DATA_1);

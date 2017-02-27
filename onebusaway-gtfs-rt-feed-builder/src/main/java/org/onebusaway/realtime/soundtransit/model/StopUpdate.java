@@ -15,8 +15,6 @@
  */
 package org.onebusaway.realtime.soundtransit.model;
 
-import java.util.List;
-
 import org.codehaus.jackson.annotate.JsonProperty;
 
 public class StopUpdate {
@@ -50,7 +48,7 @@ public class StopUpdate {
 		this.arrivalTime = arrivalTime;
 	}
 	public String toString() {
-	  return "{Stop " + stopId + " : "
+	  return "{\nStop " + stopId + " : "
 	      + (arrivalTime==null?"null arrivalTime":arrivalTime.toString())
 	      + "}";
 	}

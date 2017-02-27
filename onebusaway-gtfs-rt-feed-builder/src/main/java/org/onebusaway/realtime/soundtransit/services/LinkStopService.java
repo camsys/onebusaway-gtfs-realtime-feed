@@ -18,12 +18,14 @@ package org.onebusaway.realtime.soundtransit.services;
 import java.util.List;
 
 import org.onebusaway.realtime.soundtransit.model.StopOffset;
+import org.onebusaway.realtime.soundtransit.model.StopOffsets;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 
 public interface LinkStopService {
-  public void updateStopOffsets(List<TripEntry> tripEntries);
+  public StopOffsets getStopOffsets();
+  public void updateStopOffsets();
   public boolean isValidLinkStop(String stopId);
   public String getGTFSStop(String avlStopId, String direction);
   public List<StopOffset> getStopOffsets(String direction);

@@ -18,11 +18,9 @@ package org.onebusaway.realtime.soundtransit.services.test;
 import com.google.transit.realtime.GtfsRealtime.FeedEntity;
 import com.google.transit.realtime.GtfsRealtime.FeedMessage;
 import org.mockito.Mockito;
-import org.onebusaway.gtfs.model.AgencyAndId;
 import org.onebusaway.gtfs.model.Block;
-import org.onebusaway.gtfs.model.StopTime;
-import org.onebusaway.gtfs.model.Trip;
-import org.onebusaway.gtfs.model.calendar.ServiceDate;
+import org.onebusaway.realtime.soundtransit.model.StopMapper;
+import org.onebusaway.realtime.soundtransit.model.StopOffsets;
 import org.onebusaway.realtime.soundtransit.services.AvlParseService;
 import org.onebusaway.realtime.soundtransit.services.AvlParseServiceImpl;
 import org.onebusaway.realtime.soundtransit.services.FeedServiceImpl;
@@ -33,7 +31,6 @@ import org.onebusaway.realtime.soundtransit.services.TUFeedBuilderScheduleServic
 import org.onebusaway.realtime.soundtransit.services.TUFeedBuilderServiceImpl;
 import org.onebusaway.transit_data_federation.impl.blocks.BlockRunServiceImpl;
 import org.onebusaway.transit_data_federation.services.FederatedTransitDataBundle;
-import org.onebusaway.transit_data_federation.services.blocks.ScheduledBlockLocation;
 import org.onebusaway.transit_data_federation.services.transit_graph.TransitGraphDao;
 import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 import org.slf4j.Logger;
@@ -43,21 +40,20 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import static org.junit.Assert.assertNotNull;
+import static org.onebusaway.realtime.soundtransit.services.test.AVLDataParser.LEGACY_STOP_MAPPING_FILE;
+import static org.onebusaway.realtime.soundtransit.services.test.AVLDataParser.STOP_MAPPING_FILE;
 
 public abstract class AbstractFeedBuilderTest {
 
   protected static Logger _log = LoggerFactory.getLogger(AbstractFeedBuilderTest.class);
 
-  private static final String LINK_ROUTE_ID = "100479";
-  
   protected LinkGtfsAdaptor ga;
   protected FeedServiceImpl _feedService;
   protected AVLDataParser avldp ;
-  protected AvlParseService avlParseService = new AvlParseServiceImpl();
+  protected AvlParseServiceImpl _avlParseService;
   protected Long _referenceTime = null;
   
 
@@ -69,8 +65,10 @@ public abstract class AbstractFeedBuilderTest {
     TUFeedBuilderServiceImpl impl = new TUFeedBuilderServiceImpl();
     TUFeedBuilderScheduleServiceImpl simpl = new TUFeedBuilderScheduleServiceImpl();
     simpl.setOverrideLastUpdatedDate(false);
+
     TUFeedBuilderComponent comp = new TUFeedBuilderComponent();
     simpl.setTUFeedBuilderComponent(comp);
+
     impl.setTUFeedBuilderScheduleServiceImpl(simpl);
     FederatedTransitDataBundle bundle = new FederatedTransitDataBundle();
     bundle.setPath(new File(System.getProperty("java.io.tmpdir")));
@@ -80,12 +78,30 @@ public abstract class AbstractFeedBuilderTest {
     buildRunBlocks(blockRunService);
 
     GtfsTransitDataServiceFacade tds = new GtfsTransitDataServiceFacade(ga, serviceDateStr, _referenceTime);
+    StopMapper stopMapper = new StopMapper();
+    if (legacyStopMapping) {
+      _log.info("loading legacy stop mapping file");
+      stopMapper.setLinkStopMappingFile(LEGACY_STOP_MAPPING_FILE);
+    } else {
+      _log.info("loading current stop mapping file");
+      stopMapper.setLinkStopMappingFile(STOP_MAPPING_FILE);
+    }
+    stopMapper.init();
+    StopOffsets offsets = new StopOffsets();
+    offsets.setTransitDataServiceFacade(tds);
+    offsets.updateStopOffsets(stopMapper);
+    _avlParseService = new AvlParseServiceImpl();
+    _avlParseService.setStopOffsets(offsets);
+    _avlParseService.setStopMapper(stopMapper);
+    _avlParseService.setTransitDataServiceFacade(tds);
+    simpl.setAvlParseService(_avlParseService);
+    comp.setAvlParseService(_avlParseService);
     LinkTripServiceImpl linkTripService = new LinkTripServiceImpl();
     linkTripService.setTransitDataServiceFacade(tds);
     linkTripService.setOverrideScheduleTime(false);
-    
+    linkTripService.setAvlParseService(_avlParseService);
     _feedService = new FeedServiceImpl();
-    _feedService.setAvlParseService(avlParseService);
+    _feedService.setAvlParseService(_avlParseService);
     _feedService.setTuFeedBuilderServiceImpl(impl);
     avldp = new AVLDataParser(_feedService);
 
@@ -94,18 +110,17 @@ public abstract class AbstractFeedBuilderTest {
     TransitGraphDao _transitGraphDao = Mockito.mock(TransitGraphDao.class);
 
     LinkStopServiceImpl linkStopService = new LinkStopServiceImpl();
+    linkStopService.setStopMapper(stopMapper);
+    linkStopService.setStopOffsets(offsets);
     if (legacyStopMapping) {
-      linkStopService.setStopMapping(avldp.buildStopMapping(AVLDataParser.LEGACY_STOP_MAPPING_FILE));
+      linkStopService.setStopMapping(avldp.buildStopMapping(LEGACY_STOP_MAPPING_FILE));
     } else {
-      linkStopService.setStopMapping(avldp.buildStopMapping(AVLDataParser.STOP_MAPPING_FILE));
+      linkStopService.setStopMapping(avldp.buildStopMapping(STOP_MAPPING_FILE));
     }
-    linkStopService.setNbStopOffsets(avldp.buildNbStopOffsets());
-    linkStopService.setSbStopOffsets(avldp.buildSbStopOffsets());
     impl.setLinkStopServiceImpl(linkStopService);
     simpl.setLinkStopServiceImpl(linkStopService);
     comp.setLinkStopServiceImpl(linkStopService);
     linkTripService.setLinkStopServiceImpl(linkStopService);
-    linkTripService.setLinkRouteId(LINK_ROUTE_ID);
     List<TripEntry> allTrips = new ArrayList<TripEntry>();
     linkTripService.setTripEntries(allTrips);
     impl.setLinkTripServiceImpl(linkTripService);

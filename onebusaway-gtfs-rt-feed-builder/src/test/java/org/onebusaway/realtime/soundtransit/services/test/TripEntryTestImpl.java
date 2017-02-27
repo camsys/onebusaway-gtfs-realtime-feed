@@ -42,9 +42,13 @@ public class TripEntryTestImpl implements TripEntry {
         _id = id;
     }
 
+    private RouteEntry _route = null;
     @Override
     public RouteEntry getRoute() {
-        throw new UnsupportedOperationException("not implemented");
+        return _route;
+    }
+    public void setRouteEntry(RouteEntry entry) {
+        _route = entry;
     }
 
     @Override

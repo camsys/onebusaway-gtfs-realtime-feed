@@ -45,8 +45,8 @@ public class TUFeedBuilderFrequencyServiceImpl {
   protected LinkTripService _linkTripService;
   protected LinkStopService _linkStopService;
   private TUFeedBuilderComponent _component;
-  
-  private AvlParseService avlParseService = new AvlParseServiceImpl();
+  private AvlParseService _avlParseService;
+
   @Autowired
   public void setLinkTripServiceImpl(LinkTripService linkTripService) {
     _linkTripService = linkTripService;
@@ -60,6 +60,11 @@ public class TUFeedBuilderFrequencyServiceImpl {
   @Autowired
   public void setTUFeedBuilderComponent(TUFeedBuilderComponent component) {
     _component = component;
+  }
+
+  @Autowired
+  public void setAvlParseService(AvlParseService service) {
+    _avlParseService = service;
   }
 
   public FeedMessage buildFeedMessage(LinkAVLData linkAVLData) {
@@ -105,7 +110,7 @@ public class TUFeedBuilderFrequencyServiceImpl {
         String lastUpdatedDate = trip.getLastUpdatedDate();
         if (lastUpdatedDate != null) {
           try {
-            Date parsedDate = avlParseService.parseAvlTime(lastUpdatedDate);
+            Date parsedDate = _avlParseService.parseAvlTime(lastUpdatedDate);
             timestamp = parsedDate.getTime() / 1000;
           } catch (Exception e) {
             _log.error("Exception parsing LastUpdatedDate time: " + lastUpdatedDate);
@@ -253,7 +258,7 @@ public class TUFeedBuilderFrequencyServiceImpl {
         if (arrivalTime != null) {
           try {
             int timeDelta = (targetOffset - baseOffset) * 1000;
-            Date adjustedDate = new Date(avlParseService.parseAvlTimeAsMillis(arrivalTime) + timeDelta);
+            Date adjustedDate = new Date(_avlParseService.parseAvlTimeAsMillis(arrivalTime) + timeDelta);
             
             // If the adjusted time is in the future or less than two minutes
             // ago, reset it to five minutes ago so it won't generate a
@@ -263,7 +268,7 @@ public class TUFeedBuilderFrequencyServiceImpl {
               adjustedDate = new Date(System.currentTimeMillis() - 5 * 60 * 1000);
             }
               
-            adjustedTime = avlParseService.formatAvlTime(adjustedDate);
+            adjustedTime = _avlParseService.formatAvlTime(adjustedDate);
           } catch (Exception e) {
             _log.error("Exception parsing arrival time: " + arrivalTime);
           }

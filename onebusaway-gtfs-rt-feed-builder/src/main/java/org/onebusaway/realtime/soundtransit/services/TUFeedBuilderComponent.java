@@ -31,7 +31,7 @@ public class TUFeedBuilderComponent {
 
   private static Logger _log = LoggerFactory.getLogger(TUFeedBuilderComponent.class);
   
-  private AvlParseService avlParseService = new AvlParseServiceImpl();
+  private AvlParseService _avlParseService;
   protected LinkTripService _linkTripService;
   protected LinkStopService _linkStopService;
 
@@ -44,6 +44,9 @@ public class TUFeedBuilderComponent {
   public void setLinkStopServiceImpl(LinkStopService linkStopService) {
     _linkStopService = linkStopService;
   }
+
+  @Autowired
+  public void setAvlParseService(AvlParseService service) { _avlParseService = service; }
 
   public FeedMessage.Builder buildHeader() {
     FeedMessage.Builder feedMessageBuilder = FeedMessage.newBuilder();
@@ -60,7 +63,7 @@ public class TUFeedBuilderComponent {
   public StopTimeUpdate buildStopTimeUpdate(String stopId, String arrivalTime,
       String direction, String scheduleRelationship,
       Long lastUpdatedInSeconds) {
-      long predictionTimeInSeconds = avlParseService.parseAvlTimeAsSeconds(arrivalTime);
+      long predictionTimeInSeconds = _avlParseService.parseAvlTimeAsSeconds(arrivalTime);
       if (lastUpdatedInSeconds != null && predictionTimeInSeconds < lastUpdatedInSeconds) {
         // our prediction is in the past
         return null;

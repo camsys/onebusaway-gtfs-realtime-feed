@@ -18,7 +18,6 @@ package org.onebusaway.realtime.soundtransit.services;
 import java.io.IOException;
 import java.util.Date;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -32,17 +31,72 @@ import org.codehaus.jackson.map.SerializationConfig;
 import org.codehaus.jackson.type.TypeReference;
 import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
+import org.onebusaway.realtime.soundtransit.model.StopMapper;
+import org.onebusaway.realtime.soundtransit.model.StopOffsets;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
+import org.onebusaway.realtime.soundtransit.model.StopUpdatePositionComparator;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
 import org.onebusaway.realtime.soundtransit.model.TripInfo;
 import org.onebusaway.realtime.soundtransit.model.TripInfoList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import javax.annotation.PostConstruct;
 
 public class AvlParseServiceImpl implements AvlParseService {
   private static Logger _log = LoggerFactory.getLogger(AvlParseServiceImpl.class);
+
+  public static final String LINK_ROUTE_ID = "100479";
+  private String _linkRouteId = LINK_ROUTE_ID;
   private SimpleDateFormat FORMATTER = new SimpleDateFormat("yyyy-MM-dd'T'kk:mm:ss.SSSXXX");
-  
+  private StopOffsets _stopOffsets = null;
+  private StopMapper _stopMapper = null;
+  private TransitDataServiceFacade _tdsf;
+  private boolean _testMode = false;
+  private boolean _allowUnknownStops = false;
+
+  @Autowired
+  public void setTransitDataServiceFacade(TransitDataServiceFacade tdsf) {
+     _tdsf = tdsf;
+  }
+
+  @Autowired
+  public void setStopOffsets(StopOffsets offsets) {
+    _stopOffsets = offsets;
+  }
+
+  @Autowired
+  public void setStopMapper(StopMapper mapper) {
+    _stopMapper = mapper;
+  }
+
+  public void setTestMode() {
+    _testMode = true;
+  }
+
+  public void setAllowUnknownStops(boolean allow) {
+    _allowUnknownStops = allow;
+  }
+
+  @Override
+  public String getLinkRouteId() {
+    return _linkRouteId;
+  }
+
+  public void setLinkRouteId(String id) {
+    _linkRouteId = id;
+  }
+
+  @PostConstruct
+  public void setup() {
+    _log.info("setup invoking background thread...");
+    // this needs to be on a background thread to allow the bundle to load!
+    StartupThread st = new StartupThread(_tdsf, _stopMapper, _stopOffsets);
+    new Thread(st).start();
+    _log.info("Background thread live!");
+  }
+
   @Override
   public LinkAVLData parseAVLFeed(String feedData) {
     LinkAVLData linkAVLData = new LinkAVLData();
@@ -107,17 +161,23 @@ public class AvlParseServiceImpl implements AvlParseService {
         }
       }
     }
-    // Sort StopUpdates in chronological order
+    // Sort StopUpdates in stop order
     List<TripInfo> trips = null;
     StopUpdatesList stopUpdatesList = null;
     List<StopUpdate> stopUpdates = null;
-    if (tripInfoList != null 
+    if (tripInfoList != null
         && (trips = tripInfoList.getTrips()) != null) {
       for (TripInfo trip : trips) {
         if ((stopUpdatesList = trip.getStopUpdates()) != null 
             && (stopUpdates  = stopUpdatesList.getUpdates()) != null 
             && stopUpdates.size() > 1) {
-          Collections.sort(stopUpdates, new StopUpdateComparator());
+          if (!_testMode) {
+            if (_log.isDebugEnabled())
+              _log.debug("Pre sort["+ trip.getTripId() +"]:" + stopUpdates);
+            Collections.sort(stopUpdates, new StopUpdatePositionComparator(_stopMapper, _stopOffsets, trip.getDirection(), _allowUnknownStops));
+            if (_log.isDebugEnabled())
+              _log.debug("Post sort["+ trip.getTripId() +"]:" + stopUpdates);
+          }
         }
       }
     }
@@ -130,49 +190,6 @@ public class AvlParseServiceImpl implements AvlParseService {
     return vehicleId;
   }
 
-  /*
-   * This method will compare two StopUpdates based on their ArrivalTime 
-   * information.  It first checks ActualTime, if any, then EstimatedTime,
-   * and finally ScheduledTime.
-   */
-  public class StopUpdateComparator implements Comparator<StopUpdate> {
-    @Override
-    public int compare(StopUpdate su1, StopUpdate su2) {
-      // Check that both updates have ArrivalTime objects
-      ArrivalTime arrivalTime1 = su1.getArrivalTime();
-      ArrivalTime arrivalTime2 = su2.getArrivalTime();
-      long arrival1 = (arrivalTime1 != null) ? 1 : 0;
-      long arrival2 = (arrivalTime2 != null) ? 1 : 0;
-      if (arrival1 == 0 || arrival2 == 0) {
-        return (int)(arrival1 - arrival2);
-      }
-      
-      arrival1 = parseAvlTimeAsMillis(arrivalTime1.getActual());
-      arrival2 = parseAvlTimeAsMillis(arrivalTime2.getActual());
-      if (arrival1 > 0 && arrival2 > 0) {
-        return (arrival1 > arrival2) ? 1 : 0;
-      } else if (arrival1 != arrival2) {  // one is zero, the other isn't
-        return (arrival1 > arrival2) ? 0 : 1;  // Non-zero has arrived already
-      }
-        
-      arrival1 = parseAvlTimeAsMillis(arrivalTime1.getEstimated());
-      arrival2 = parseAvlTimeAsMillis(arrivalTime2.getEstimated());
-      if (arrival1 > 0 && arrival2 > 0) {
-        return (arrival1 > arrival2) ? 1 : 0;
-      } else if (arrival1 != arrival2) {
-        return (arrival1 > arrival2) ? 0 : 1;
-      }
-      arrival1 = parseAvlTimeAsMillis(arrivalTime1.getScheduled());
-      arrival2 = parseAvlTimeAsMillis(arrivalTime2.getScheduled());
-      if (arrival1 > 0 && arrival2 > 0) {
-        return (arrival1 > arrival2) ? 1 : 0;
-      } else if (arrival1 != arrival2) {
-        return (arrival1 > arrival2) ? 0 : 1;
-      }
-      
-      return 0;
-    }
-  }
 
   public long parseAvlTimeAsMillis(String arrivalTime) {
     Date d = parseAvlTime(arrivalTime);
@@ -207,5 +224,53 @@ public class AvlParseServiceImpl implements AvlParseService {
   public String formatAvlTime(Date d) {
     return FORMATTER.format(d);
   }
-  
+
+  /**
+   * poll the TDS to see if the bundle has been loaded
+   * but do it off the context init thread so the bundle can be
+   * loaded in the background.
+   */
+  private static class StartupThread implements Runnable {
+
+    private TransitDataServiceFacade tdsf;
+    private StopMapper stopMapper;
+    private StopOffsets stopOffsets;
+
+    public StartupThread(TransitDataServiceFacade tdsf, StopMapper stopMapper, StopOffsets stopOffsets) {
+      this.tdsf = tdsf;
+      this.stopMapper = stopMapper;
+      this.stopOffsets = stopOffsets;
+    }
+
+    @Override
+    public void run() {
+      int tripCount = getTripCount();
+
+      while (!Thread.interrupted()
+              && tripCount == 0) {
+        try {
+          _log.info("stop offset load waiting on bundle....");
+          Thread.currentThread().sleep(5 * 1000);
+          tripCount = getTripCount();
+
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      _log.info("loading stop offsets!");
+      stopOffsets.updateStopOffsets(stopMapper);
+    }
+
+    private int getTripCount() {
+      int tripCount = 0;
+      try {
+        if (tdsf.getAllTrips() != null)
+          tripCount = tdsf.getAllTrips().size();
+      } catch (Exception any) {
+        // bury
+      }
+      return tripCount;
+    }
+  }
+
 }

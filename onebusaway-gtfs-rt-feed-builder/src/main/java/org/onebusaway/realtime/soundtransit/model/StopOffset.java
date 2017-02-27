@@ -56,7 +56,7 @@ public class StopOffset {
   }
   
   public String toString() {
-    return ("GTFS StopId: " + gtfsStopId + ", AVL StopId: " + linkStopId
+    return ("\nGTFS StopId: " + gtfsStopId + ", AVL StopId: " + linkStopId
         + ", direction: " + direction + ", offset: " + offset);
   }
 }

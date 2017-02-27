@@ -35,36 +35,20 @@
     <bean id="vehiclePositionsResource" class="org.onebusaway.api.gtfs_realtime.VehiclePositionsResource">
     </bean>
 
+	<bean id="transitDataServiceFacade" class="org.onebusaway.realtime.soundtransit.services.TransitDataServiceFacadeImpl">
+	</bean>
+
+	<bean id="stopMapper" class="org.onebusaway.realtime.soundtransit.model.StopMapper">
+		<property name="linkStopMappingFile" value="/var/lib/oba/LinkStopMapping.txt" />
+	</bean>
+	<bean id="stopOffsets" class="org.onebusaway.realtime.soundtransit.model.StopOffsets">
+		<property name="transitDataServiceFacade" ref="transitDataServiceFacade" />
+	</bean>
+
 	<!-- TDS support -->
 	<import resource="classpath:org/onebusaway/transit_data_federation/application-context.xml" />
 
 	<bean id="taskScheduler"
 		class="org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler" />
-	<!-- <bean id="avlTranslator" class="org.onebusaway.realtime.soundtransit.tds.AVLTranslator" 
-		> <property name="transitDataService" ref="transitDataServiceImpl" /> <property 
-		name="blockCalendarService" ref="blockCalendarServiceImpl" /> <property name="blockLocationService" 
-		ref="blockLocationServiceImpl" /> <property name="tripBeanService" ref="tripBeanServiceImpl" 
-		/> <property name="tripStopTimesBeanService" ref="tripStopTimesBeanServiceImpl" 
-		/> </bean> -->
-	
-	<!--
-		<property name="gtfsRealtimeProvider" ref="gtfsProvider" />
-	</bean>
-	<bean id="gtfsProvider"
-		class="org.onebusaway.gtfs_realtime.exporter.GtfsRealtimeProviderImpl" />
-	<bean id="tripUpdatesServlet"
-		class="org.onebusaway.gtfs_realtime.exporter.TripUpdatesServlet">
-		<property name="provider" ref="gtfsProvider" />
-	</bean>
-	<bean id="vehiclePostitionsServlet"
-		class="org.onebusaway.gtfs_realtime.exporter.VehiclePositionsServlet">
-		<property name="provider" ref="gtfsProvider" />
-	</bean>
-	-->
-	<!--
-	<bean id="feedService" 
-		class="org.onebusaway.realtime.soundtransit.services.FeedServiceImpl" >
-	</bean>
-	-->
 
 </beans>

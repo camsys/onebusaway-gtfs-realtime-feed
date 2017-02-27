@@ -16,9 +16,7 @@
 package org.onebusaway.realtime.soundtransit.services;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -50,7 +48,7 @@ public class TUFeedBuilderScheduleServiceImpl {
   private TUFeedBuilderComponent _component;
   protected LinkTripService _linkTripService;
   protected LinkStopService _linkStopService;
-  private AvlParseService avlParseService = new AvlParseServiceImpl();
+  private AvlParseService _avlParseService;
   private boolean _overrideLastUpdatedDate = true;
 
   @Autowired
@@ -67,7 +65,10 @@ public class TUFeedBuilderScheduleServiceImpl {
   public void setTUFeedBuilderComponent(TUFeedBuilderComponent component) {
     _component = component;
   }
-  
+
+  @Autowired
+  public void setAvlParseService(AvlParseService service) { _avlParseService = service; }
+
   public void setOverrideLastUpdatedDate(boolean override) {
     _overrideLastUpdatedDate = override;
   }
@@ -83,7 +84,7 @@ public class TUFeedBuilderScheduleServiceImpl {
         StringBuffer debug = new StringBuffer();
         try {
           
-          String vehicleId = avlParseService.hashVehicleId(trip.getVehicleId());
+          String vehicleId = _avlParseService.hashVehicleId(trip.getVehicleId());
           debug.append(" vehicleId = " + vehicleId + "\n");
           long lastUpdatedInSeconds = getLastUpdatedTimestampForTrip(vehicleId, trip);
           debug.append(" lastUpdatedInSeconds = " + lastUpdatedInSeconds + "\n");
@@ -165,7 +166,7 @@ public class TUFeedBuilderScheduleServiceImpl {
   // last modified updates on each request, we want it updated only when the data changed
   // use the vehicle position as an indicator that something has changed
   private long getLastUpdatedTimestampForTrip(String vehicleId, TripInfo trip) {
-    long lastUpdated = avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
+    long lastUpdated = _avlParseService.parseAvlTimeAsSeconds(trip.getLastUpdatedDate());
     if (_overrideLastUpdatedDate && Math.abs(lastUpdated - (System.currentTimeMillis()/1000)) > 3600) {
       // time is off by more than an hour, ignore it
       lastUpdated = System.currentTimeMillis() / 1000;
@@ -231,10 +232,15 @@ public class TUFeedBuilderScheduleServiceImpl {
   /*
    * return all stop time updates in the future.  In the future is
    * any timestamp greater than lastUpdated.
+   *
+   * This method HAS TO assume stopUpdates are in stop order -- they have
+   * been sorted by the avlParserService!
    */
-  private List<StopTimeUpdate> findArrivalTimeUpdates(
+   List<StopTimeUpdate> findArrivalTimeUpdates(
       List<StopUpdate> stopUpdates, String tripId, long lastUpdatedInSeconds) {
+
       List<StopTimeUpdate> updates = new ArrayList<StopTimeUpdate>();
+      List<String> triggerStops = new ArrayList<String>();
       for (int i = 0; i < stopUpdates.size(); i++) {
         StopUpdate stopUpdate = stopUpdates.get(i);
         String tripDirection = _linkTripService.getTripDirectionFromTripId(tripId);
@@ -245,6 +251,20 @@ public class TUFeedBuilderScheduleServiceImpl {
         if (stu != null) {
           updates.add(stu);
         }
+        if (stopUpdate.getArrivalTime() != null
+                && stopUpdate.getArrivalTime().getActual() != null) {
+          // we found an arrival, truncate our list and continue searching
+          // this prevents duplicate/contradictory predictions
+          _log.debug("CLEARING stopUpdate list because of stop=" + stopUpdate.getStopId());
+          triggerStops.add(stopUpdate.getStopId());
+          updates.clear();
+        }
+      }
+
+      if (updates.size() == 0) {
+        _log.info("no updates due to triggers=" + triggerStops);
+      } else {
+        _log.debug("returning " + updates.size() + " updates");
       }
     return updates;
   }

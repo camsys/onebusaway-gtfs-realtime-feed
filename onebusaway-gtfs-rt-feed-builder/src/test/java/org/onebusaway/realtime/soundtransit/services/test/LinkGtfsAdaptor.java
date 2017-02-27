@@ -35,7 +35,9 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import static org.junit.Assert.assertTrue;
@@ -76,6 +78,16 @@ public class LinkGtfsAdaptor {
     return dao.getAllBlocks();
   }
   public Collection<Trip> getAllTrips() { return dao.getAllTrips(); }
+  public Collection<Trip> getAllTripsByRouteId(String routeId) {
+    List<Trip> filtered = new ArrayList<Trip>();
+    for (Trip trip : getAllTrips()) {
+      if (routeId.equals(trip.getRoute().getId().getId())) {
+        filtered.add(trip);
+      }
+    }
+
+    return filtered;
+  }
 
   public Trip getTripById(String tripId) {
     for (Trip trip : dao.getAllTrips()) {
@@ -105,16 +117,21 @@ public class LinkGtfsAdaptor {
     return selectedTrip;
   }
 
+  // cache this!
+  private Map<String, List<StopTime>> _stopTimeCache = new HashMap<String, List<StopTime>>();
   public List<StopTime> getStopTimesForTripId(String tripId) {
-    List<StopTime> stopTimes = new ArrayList<StopTime>();
-    for (StopTime st : dao.getAllStopTimes()) {
-      if (st.getTrip().getId().getId().equals(tripId)) {
-        stopTimes.add(st);
+    if (!_stopTimeCache.containsKey(tripId)) {
+      List<StopTime> stopTimes = new ArrayList<StopTime>();
+      for (StopTime st : dao.getAllStopTimes()) {
+        if (st.getTrip().getId().getId().equals(tripId)) {
+          stopTimes.add(st);
+        }
       }
+      assertTrue(stopTimes.size() > 0);
+      Collections.sort(stopTimes);
+      _stopTimeCache.put(tripId, stopTimes);
     }
-    assertTrue(stopTimes.size() > 0);
-    Collections.sort(stopTimes);
-    return stopTimes;
+    return _stopTimeCache.get(tripId);
   }
   
   public String getTripDirectionFromTripId(String tripId) {
