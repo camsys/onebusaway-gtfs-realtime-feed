@@ -197,12 +197,22 @@ public class AvlParseServiceImpl implements AvlParseService {
   * look for predictions (null actual arrival times)
    */
   public boolean hasPredictions(TripInfo trip) {
+    long lastUpdated = parseAvlTimeAsMillis(trip.getLastUpdatedDate());
     boolean foundNullSchedule = false;
     if (trip != null && trip.getStopUpdates() != null && trip.getStopUpdates().getUpdates() != null) {
       for (StopUpdate su : trip.getStopUpdates().getUpdates()) {
         if (su.getArrivalTime().getActual() == null) {
-          foundNullSchedule = true;
-          break;
+          if (lastUpdated == 0) {
+            // for whatever reason we don't have a date to compare to, assume valid
+            foundNullSchedule = true;
+            break;
+          } else {
+            long estimated = parseAvlTimeAsMillis(su.getArrivalTime().getEstimated());
+            if (estimated >= lastUpdated) {
+              // prediction is in the future, keep it
+              foundNullSchedule = true;
+            }
+          }
         }
       }
     }
