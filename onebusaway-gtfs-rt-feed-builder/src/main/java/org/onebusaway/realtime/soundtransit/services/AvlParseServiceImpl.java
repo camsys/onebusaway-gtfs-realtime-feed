@@ -173,10 +173,12 @@ public class AvlParseServiceImpl implements AvlParseService {
             && stopUpdates.size() > 1) {
           if (!_testMode) {
             if (_log.isDebugEnabled())
-              _log.debug("Pre sort["+ trip.getTripId() +"]:" + stopUpdates);
+              _log.debug("Pre sort["+ trip.getTripId() + ":" + trip.getDirection() + "]:" + stopUpdates);
             Collections.sort(stopUpdates, new StopUpdatePositionComparator(_stopMapper, _stopOffsets, trip.getDirection(), _allowUnknownStops));
             if (_log.isDebugEnabled())
-              _log.debug("Post sort["+ trip.getTripId() +"]:" + stopUpdates);
+              _log.debug("Post sort["+ trip.getTripId() + ":" + trip.getDirection() + "]:" + stopUpdates);
+          } else {
+            _log.warn("test mode:  stop sorting disabled");
           }
         }
       }

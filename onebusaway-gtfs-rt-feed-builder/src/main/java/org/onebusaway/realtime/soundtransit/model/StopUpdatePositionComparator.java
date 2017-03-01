@@ -48,11 +48,8 @@ public class StopUpdatePositionComparator implements Comparator<StopUpdate> {
         return compareTo(_direction, getPositionOfStop(stopId1), getPositionOfStop(stopId2));
     }
     public int compareTo(String direction, int pos1, int pos2) {
-        if (isNorthBound(direction)) {
-            return Integer.compare(pos2, pos1);
-        } else {
-            return Integer.compare(pos1, pos2);
-        }
+        // it turns out direction isn't important, stop positions imply this
+        return Integer.compare(pos1, pos2);
     }
 
     public boolean isNorthBound(String direction) {

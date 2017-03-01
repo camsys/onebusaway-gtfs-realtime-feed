@@ -150,7 +150,7 @@ public class StopOffsets {
             String gtfsStopId = stopTimeEntry.getStop().getId().getId().toString();
             String avlStopId = stopMapper.getAVLStopId(gtfsStopId, "0");
             int arrivalTime = stopTimeEntry.getArrivalTime();
-            _log.info("GTFS/AVL id: " + gtfsStopId + " / " + avlStopId + " / " + arrivalTime);
+            _log.debug("sb GTFS/AVL id: " + gtfsStopId + " / " + avlStopId + " / " + arrivalTime);
             addStopOffset(gtfsStopId, avlStopId, "0", arrivalTime);
         }
         List<StopTimeEntry> nbStopTimeEntries = new ArrayList<StopTimeEntry>();
@@ -161,7 +161,7 @@ public class StopOffsets {
             String gtfsStopId = stopTimeEntry.getStop().getId().getId().toString();
             String avlStopId = stopMapper.getAVLStopId(gtfsStopId, "1");
             int arrivalTime = stopTimeEntry.getArrivalTime();
-            _log.debug("GTFS/AVL id: " + gtfsStopId + " / " + avlStopId + " / " + arrivalTime);
+            _log.debug("nb GTFS/AVL id: " + gtfsStopId + " / " + avlStopId + " / " + arrivalTime);
             addStopOffset(gtfsStopId, avlStopId, "1", arrivalTime);
         }
 

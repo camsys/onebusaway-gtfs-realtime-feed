@@ -228,6 +228,7 @@ public class TUFeedBuilderScheduleServiceImpl {
       for (int i = 0; i < stopUpdates.size(); i++) {
         StopUpdate stopUpdate = stopUpdates.get(i);
         String tripDirection = _linkTripService.getTripDirectionFromTripId(tripId);
+        _log.debug("stop=" + stopUpdate.getStopId() + " with direction=" + tripDirection);
         ArrivalTime arrival = stopUpdate.getArrivalTime();
         // buildStopTimeUpdate will ensure prediction is in future
         StopTimeUpdate stu = _component.buildStopTimeUpdate(stopUpdate.getStopId(),
