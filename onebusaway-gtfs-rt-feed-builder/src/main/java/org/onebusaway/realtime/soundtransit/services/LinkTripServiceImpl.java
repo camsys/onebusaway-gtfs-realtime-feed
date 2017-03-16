@@ -559,7 +559,13 @@ public class LinkTripServiceImpl implements LinkTripService {
         continue;
       }
 
-      boolean isActiveToday = _tdsf.areServiceIdsActiveOnServiceDate(gtfsTripEntry.getServiceId(), new Date(serviceDateInMillis));
+      boolean isActiveToday = false;
+      try {
+        isActiveToday = _tdsf.areServiceIdsActiveOnServiceDate(gtfsTripEntry.getServiceId(), new Date(serviceDateInMillis));
+      } catch (Throwable t) {
+        // calendar search is sensitive to bad data
+        _log.error("exception checking service id=" + gtfsTripEntry.getServiceId() + " with serviceDate= " + new Date(serviceDateInMillis), t);
+      }
       if (!isActiveToday) {
         _log.debug("discarding trip " + gtfsTripEntry.getId() + " as it is not active on serviceDate " + new Date(serviceDateInMillis));
         continue;

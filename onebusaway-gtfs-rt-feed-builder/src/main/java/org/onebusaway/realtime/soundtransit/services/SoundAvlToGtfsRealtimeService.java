@@ -43,6 +43,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import javax.servlet.ServletContext;
 
+import org.apache.commons.lang.StringUtils;
 import org.onebusaway.realtime.soundtransit.model.LinkAVLData;
 import org.onebusaway.realtime.soundtransit.model.TripInfoList;
 import org.slf4j.Logger;
@@ -62,6 +63,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
   private ScheduledExecutorService _refreshExecutor;
   private FeedService _feedService;
   private URL _linkAvlFeedUrl;
+  private String _apiKey;
 
   private String _url = null;
   private int _refreshOffset = 0;  // Default to refresh on the minute
@@ -93,6 +95,10 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 
   public void setLinkAvlFeedUrl(URL linkAvlFeedUrl) {
     _linkAvlFeedUrl = linkAvlFeedUrl;
+  }
+
+  public void setApiKey(String apiKey) {
+    _apiKey = apiKey;
   }
 
   public FeedMessage getVehiclePositionsFM() {
@@ -173,7 +179,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
 
   public int[] writeGtfsRealtimeOutput() throws Exception {
     try {
-      String dataFromAvl = readAvlUpdatesFromUrl(_linkAvlFeedUrl);
+      String dataFromAvl = readAvlUpdatesFromUrl(_linkAvlFeedUrl, _apiKey);
       _log.debug("AVL: " + dataFromAvl);
       return writeGtfsRealtimeOutput(dataFromAvl);
     } catch (Exception any) {
@@ -207,7 +213,7 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     }
   }
 
-  private String readAvlUpdatesFromUrl(URL url) throws IOException {
+  private String readAvlUpdatesFromUrl(URL url, String apiKey) throws IOException {
     String result = "";
     HttpURLConnection avlConnection = (HttpURLConnection) url.openConnection();
     
@@ -222,6 +228,13 @@ public class SoundAvlToGtfsRealtimeService implements ServletContextAware {
     avlConnection.setRequestProperty(
         "Accept",
         "application/json");
+    if (StringUtils.isNotBlank(apiKey)) {
+      // if we have an apiKey set it as an authorization header
+      avlConnection.setRequestProperty(
+              "Authorization",
+              "Bearer " + apiKey
+      );
+    }
     InputStream in = avlConnection.getInputStream();
     try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
       String nextLine = "";
