@@ -7,7 +7,7 @@
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>onebusaway-gtfs-realtime-feed</artifactId>
-  <version>0.0.3</version>
+  <version>0.0.4-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>onebusaway-gtfs-realtime-feed</name>
@@ -45,6 +45,11 @@
     <repository>
       <id>releases-obaweb-repo</id>
       <url>http://repo.obaweb.org:8080/archiva/repository/releases/</url> 
+    </repository>
+    <!-- we stil have an old dependency on st special csv -->
+    <repository>
+      <id>releases-old-camsys-repo</id>
+      <url>http://archiva.obaweb.org/archiva/repository/releases/</url>
     </repository>
     <repository>
       <id>snapshots-obaweb-repo</id>

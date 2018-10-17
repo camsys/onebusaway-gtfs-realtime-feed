@@ -4,7 +4,7 @@
 	<parent>
 	    <groupId>org.onebusaway</groupId>
 	    <artifactId>onebusaway-gtfs-realtime-feed</artifactId>
-	    <version>0.0.3</version>
+	    <version>0.0.4-SNAPSHOT</version>
 	</parent>
 	<artifactId>onebusaway-gtfs-rt-feed-builder</artifactId>
 	<name>onebusaway-gtfs-rt-feed-builder</name>
