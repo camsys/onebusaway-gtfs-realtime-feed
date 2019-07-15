@@ -15,6 +15,7 @@
  */
 package org.onebusaway.realtime.soundtransit.services.test;
 
+import org.onebusaway.realtime.api.OccupancyStatus;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockConfigurationEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockEntry;
 import org.onebusaway.transit_data_federation.services.transit_graph.BlockStopTimeEntry;
@@ -64,6 +65,11 @@ public class BlockConfigurationEntryTestImpl implements BlockConfigurationEntry 
     @Override
     public double getDistanceAlongBlockForIndex(int i) {
         throw new UnsupportedOperationException("not implemented");
+    }
+
+    @Override
+    public OccupancyStatus getOccupancyForIndex(int i) {
+        return null;
     }
 
     @Override

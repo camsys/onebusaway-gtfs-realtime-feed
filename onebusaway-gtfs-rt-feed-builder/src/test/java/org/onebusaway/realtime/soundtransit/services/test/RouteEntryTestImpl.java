@@ -46,4 +46,9 @@ public class RouteEntryTestImpl implements RouteEntry {
     public List<TripEntry> getTrips() {
         throw new UnsupportedOperationException("not implemented");
     }
+
+    @Override
+    public int getType() {
+        return 0;
+    }
 }
