@@ -39,7 +39,7 @@
 	</bean>
 
 	<bean id="stopMapper" class="org.onebusaway.realtime.soundtransit.model.StopMapper">
-		<property name="linkStopMappingFile" value="/var/lib/oba/LinkStopMapping.txt" />
+		<property name="linkStopMappingFile" value="${linkFile}" />
 	</bean>
 	<bean id="stopOffsets" class="org.onebusaway.realtime.soundtransit.model.StopOffsets">
 		<property name="transitDataServiceFacade" ref="transitDataServiceFacade" />
