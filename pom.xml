@@ -3,18 +3,15 @@
   <parent>
     <artifactId>onebusaway</artifactId>
     <groupId>org.onebusaway</groupId>
-    <version>1.1.7</version>
+    <version>1.2.9</version>
   </parent>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>onebusaway-gtfs-realtime-feed</artifactId>
-  <version>0.0.6</version>
+  <version>0.0.7</version>
   <packaging>pom</packaging>
 
   <name>onebusaway-gtfs-realtime-feed</name>
   <description>The core OneBusAway modules for building a gtfs realtime feed.</description>
-  <!--
-  <url>https://github.com/OneBusAway/onebusaway-application-modules/wiki/</url>
-  -->
 
   <!-- Common Software Dependency Versions -->
   <properties>
@@ -35,38 +32,30 @@
 
   <repositories>
     <repository>
-      <id>releases-camsys-repo</id>
-      <url>http://developer.onebusaway.org/archiva/repository/releases/</url> 
+      <id>repo.camsys-apps.com</id>
+      <url>https://repo.camsys-apps.com/third-party/</url>
     </repository>
     <repository>
-      <id>snapshots-camsys-repo</id>
-      <url>http://developer.onebusaway.org/archiva/repository/snapshots/</url> 
+      <id>releases-camsys-public-repo</id>
+      <url>https://repo.camsys-apps.com/releases/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
     </repository>
     <repository>
-      <id>releases-obaweb-repo</id>
-      <url>http://repo.obaweb.org:8080/archiva/repository/releases/</url> 
-    </repository>
-    <!-- we stil have an old dependency on st special csv -->
-    <repository>
-      <id>releases-old-camsys-repo</id>
-      <url>http://archiva.obaweb.org/archiva/repository/releases/</url>
-    </repository>
-    <repository>
-      <id>snapshots-obaweb-repo</id>
-      <url>http://repo.obaweb.org:8080/archiva/repository/snapshots/</url> 
-    </repository>
-    <repository>
-      <id>public.onebusaway.org</id>
-      <url>http://nexus.onebusaway.org/content/groups/public/</url>
+      <id>snapshots-camsys-public-repo</id>
+      <url>https://repo.camsys-apps.com/snapshots/</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
     </repository>
   </repositories>
-
-  <pluginRepositories>
-    <pluginRepository>
-      <id>public.onebusaway.org</id>
-      <url>http://nexus.onebusaway.org/content/groups/public/</url>
-    </pluginRepository>
-  </pluginRepositories>
 
   <scm>
     <connection>scm:git:http://github.com/OneBusAway/onebusaway-application-modules.git</connection>
@@ -78,19 +67,6 @@
     <system>GitHub</system>
     <url>https://github.com/OneBusAway/onebusaway-application-modules/issues</url>
   </issueManagement>
-
-  <distributionManagement>
-    <repository>
-      <id>releases-obaweb-repo</id>
-      <name>OneBusAway OBAWEB Release Repo</name>
-      <url>http://repo.obaweb.org:8080/archiva/repository/releases/</url> 
-    </repository>
-    <snapshotRepository>
-      <id>snapshots-obaweb-repo</id>
-      <name>OneBusAway OBAWEB Snapshot Repo</name>
-      <url>http://repo.obaweb.org:8080/archiva/repository/snapshots/</url> 
-    </snapshotRepository>
-  </distributionManagement>
 
   <modules>
     <module>onebusaway-gtfs-rt-feed-builder</module>
