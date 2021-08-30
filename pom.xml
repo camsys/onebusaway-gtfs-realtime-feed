@@ -491,6 +491,11 @@
     </plugins>
     <extensions>
       <extension>
+        <groupId>org.apache.maven.wagon</groupId>
+        <artifactId>wagon-ssh</artifactId>
+        <version>3.3.4</version>
+      </extension>
+      <extension>
         <groupId>com.github.seahen</groupId>
         <artifactId>maven-s3-wagon</artifactId>
         <version>1.3.2</version>
