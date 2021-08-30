@@ -4,14 +4,14 @@
 	<parent>
 	    <groupId>org.onebusaway</groupId>
 	    <artifactId>onebusaway-gtfs-realtime-feed</artifactId>
-	    <version>0.0.6</version>
+	    <version>0.0.7-SNAPSHOT</version>
 	</parent>
 	<artifactId>onebusaway-gtfs-rt-feed-builder</artifactId>
 	<name>onebusaway-gtfs-rt-feed-builder</name>
 	<packaging>war</packaging>
 
 	<properties>
-		<oba.version>2.0.7-cs</oba.version>
+		<oba.version>2.0.76-cs</oba.version>
 	</properties>
 	<dependencies>
 		<dependency>

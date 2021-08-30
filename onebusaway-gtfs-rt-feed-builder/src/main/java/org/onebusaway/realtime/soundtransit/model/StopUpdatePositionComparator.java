@@ -103,9 +103,11 @@ public class StopUpdatePositionComparator implements Comparator<StopUpdate> {
             }
         }
         if (!_allowUnknownStops) {
-            throw new IllegalStateException(("unknown stop |" + avlStopId
-                    + "| with direction=" + _direction
-                    + " and offsets=" + _offsets));
+//            throw new IllegalStateException(("unknown stop |" + avlStopId
+//                    + "| with direction=" + _direction
+//                    + " and offsets=" + _offsets));
+            _log.error("unknown stop |" + avlStopId
+                    + "| with direction=" + _direction);
         }
         // we don't know
         return 0;

@@ -54,7 +54,7 @@ public class AvlParseServiceImpl implements AvlParseService {
   private StopMapper _stopMapper = null;
   private TransitDataServiceFacade _tdsf;
   private boolean _testMode = false;
-  private boolean _allowUnknownStops = false;
+  private boolean _allowUnknownStops = true;
 
   @Autowired
   public void setTransitDataServiceFacade(TransitDataServiceFacade tdsf) {
