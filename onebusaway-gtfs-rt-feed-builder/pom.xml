@@ -12,6 +12,9 @@
 
 	<properties>
 		<oba.version>2.0.76-cs</oba.version>
+		<distribution_id>releases-camsys-public-repo</distribution_id>
+		<distribution_name>Camsys Public Release Repo</distribution_name>
+		<distribution_url>s3://repo.camsys-apps.com/releases/</distribution_url>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -134,6 +137,23 @@
 		</dependency>
     
 	</dependencies>
+
+	<distributionManagement>
+		<repository>
+			<id>${distribution_id}</id>
+			<name>${distribution_name}</name>
+			<url>${distribution_url}</url>
+		</repository>
+		<snapshotRepository>
+			<id>${snapshot_distribution_id}</id>
+			<name>${snapshot_distribution_name}</name>
+			<url>${snapshot_distribution_url}</url>
+		</snapshotRepository>
+		<site>
+			<id>${site_id}</id>
+			<url>${site_url}</url>
+		</site>
+	</distributionManagement>
 
 	<build>
 		<plugins>
