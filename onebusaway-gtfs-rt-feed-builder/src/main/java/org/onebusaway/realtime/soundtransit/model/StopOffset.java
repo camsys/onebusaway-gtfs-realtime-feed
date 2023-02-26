@@ -15,7 +15,6 @@
  */
 package org.onebusaway.realtime.soundtransit.model;
 
-import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
 
 public class StopOffset {
   private String gtfsStopId;
