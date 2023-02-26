@@ -21,7 +21,6 @@ import org.onebusaway.realtime.soundtransit.model.StopOffset;
 import org.onebusaway.realtime.soundtransit.model.StopOffsets;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
-import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 
 public interface LinkStopService {
   public StopOffsets getStopOffsets();
