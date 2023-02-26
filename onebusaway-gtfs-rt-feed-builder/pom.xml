@@ -4,14 +4,14 @@
 	<parent>
 	    <groupId>org.onebusaway</groupId>
 	    <artifactId>onebusaway-gtfs-realtime-feed</artifactId>
-	    <version>0.0.7</version>
+	    <version>0.0.8-SNAPSHOT</version>
 	</parent>
 	<artifactId>onebusaway-gtfs-rt-feed-builder</artifactId>
 	<name>onebusaway-gtfs-rt-feed-builder</name>
 	<packaging>war</packaging>
 
 	<properties>
-		<oba.version>2.0.76-cs</oba.version>
+		<oba.version>2.2.8-cs</oba.version>
 		<distribution_id>releases-camsys-public-repo</distribution_id>
 		<distribution_name>Camsys Public Release Repo</distribution_name>
 		<distribution_url>s3://repo.camsys-apps.com/releases/</distribution_url>
