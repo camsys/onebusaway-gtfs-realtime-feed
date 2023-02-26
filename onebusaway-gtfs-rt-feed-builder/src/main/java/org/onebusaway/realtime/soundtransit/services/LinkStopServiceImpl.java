@@ -15,23 +15,15 @@
  */
 package org.onebusaway.realtime.soundtransit.services;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import javax.annotation.PostConstruct;
 
 import org.onebusaway.realtime.soundtransit.model.ArrivalTime;
 import org.onebusaway.realtime.soundtransit.model.StopMapper;
@@ -39,8 +31,6 @@ import org.onebusaway.realtime.soundtransit.model.StopOffset;
 import org.onebusaway.realtime.soundtransit.model.StopOffsets;
 import org.onebusaway.realtime.soundtransit.model.StopUpdate;
 import org.onebusaway.realtime.soundtransit.model.StopUpdatesList;
-import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
-import org.onebusaway.transit_data_federation.services.transit_graph.TripEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
