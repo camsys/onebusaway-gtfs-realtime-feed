@@ -11,7 +11,7 @@
 	<packaging>war</packaging>
 
 	<properties>
-		<oba.version>2.2.9-cs</oba.version>
+		<oba.version>2.3.2.2-cs</oba.version>
 		<distribution_id>releases-camsys-public-repo</distribution_id>
 		<distribution_name>Camsys Public Release Repo</distribution_name>
 		<distribution_url>s3://repo.camsys-apps.com/releases/</distribution_url>
