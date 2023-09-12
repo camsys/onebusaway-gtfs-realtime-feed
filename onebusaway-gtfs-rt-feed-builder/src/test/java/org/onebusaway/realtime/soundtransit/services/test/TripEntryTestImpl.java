@@ -70,8 +70,9 @@ public class TripEntryTestImpl implements TripEntry {
     public BlockEntry getBlock() {
         return _block;
     }
-    public void setBlock(BlockEntry block) {
+    public TripEntry setBlock(BlockEntry block) {
         _block = block;
+        return null;
     }
 
     LocalizedServiceId _serviceId;

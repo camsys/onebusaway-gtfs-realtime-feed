@@ -23,6 +23,7 @@ import org.onebusaway.transit_data_federation.model.narrative.RouteCollectionNar
 import org.onebusaway.transit_data_federation.model.narrative.StopNarrative;
 import org.onebusaway.transit_data_federation.model.narrative.StopTimeNarrative;
 import org.onebusaway.transit_data_federation.model.narrative.TripNarrative;
+import org.onebusaway.transit_data_federation.services.blocks.BlockTripIndex;
 import org.onebusaway.transit_data_federation.services.narrative.NarrativeService;
 import org.onebusaway.transit_data_federation.services.transit_graph.StopTimeEntry;
 
@@ -84,5 +85,25 @@ public class NarrativeServiceTestImpl implements NarrativeService {
         sps.setLats(lats);
         sps.setDistTraveled(dist);
         return sps;
+    }
+
+    @Override
+    public void addDynamicTrip(BlockTripIndex blockTripIndex) {
+        // no op
+    }
+
+    @Override
+    public List<StopTimeNarrative> getStopTimeNarrativesForPattern(AgencyAndId agencyAndId, String s, List<AgencyAndId> list) {
+        return null;
+    }
+
+    @Override
+    public StopTimeNarrative getStopTimeNarrativeForPattern(AgencyAndId agencyAndId, AgencyAndId agencyAndId1, String s) {
+        return null;
+    }
+
+    @Override
+    public void addShapePoints(ShapePoints shapePoints) {
+        // no op
     }
 }
